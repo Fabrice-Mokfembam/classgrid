@@ -31,14 +31,12 @@ None of that is a criticism of the current state — it's an accurate MVP-demo s
 
 Everything else depends on knowing *which school* is asking for data, which depends on this being real. Start here.
 
-- [ ] In `components/auth-screen.tsx`, replace the sign-up flow's final step (currently `toast.success(...); onComplete();` inside `next()`) with:
-  - `supabase.auth.signUp({ email, password })` using the collected `adminEmail` / password
-  - On success, call the `create_school_workspace` RPC (already defined in the migration) with the collected profile fields, to create the school + membership + academic year + working days in one transaction
-  - Surface real errors inline using the `Field`/`errors` pattern already built (e.g. "email already registered") instead of just failing silently
-- [ ] Wire the sign-in form (`mode === "signin"` branch) to `supabase.auth.signInWithPassword()`. It currently calls `onComplete()` on any submit, valid or not.
-- [ ] Make "Sign out" in `components/app-shell.tsx` actually call `supabase.auth.signOut()` — right now it just flips the parent's screen state back to `"landing"`, so a signed-in session would still silently exist.
-- [ ] On app load (`app/page.tsx`), check for an existing session (`supabase.auth.getUser()`) before showing the landing page, so a returning logged-in admin lands in the app, not back at the marketing page.
-- [ ] Add a minimal "current school" context: after login, fetch the user's `school_memberships` row (+ joined `schools` and current `academic_years`), and pass school name / academic year down instead of the hardcoded "Excellence Bilingual Academy" / "2026/2027" currently baked into `app-shell.tsx`'s sidebar.
+- [x] `components/auth-screen.tsx` calls `supabase.auth.signUp()` for real. Email confirmation is **on** (deliberate choice — see `supabase.md`), so there's no session at sign-up time to call `create_school_workspace` with yet. The whole collected school profile rides along as sign-up metadata (`buildPendingSchool()`) instead of being lost.
+- [x] `app/auth/callback/route.ts` reads that metadata back out after the confirmation link is clicked (once a real session exists) and calls `create_school_workspace` there. Migration `20260815194423_workspace_slug_levels_days.sql` extended that RPC to also generate the slug and insert `levels` and a 5-/6-day week — both were silently dropped before.
+- [x] A "check your email" screen shows instead of jumping straight into the app after sign-up.
+- [x] Sign-in wired to `supabase.auth.signInWithPassword()`, sign-out wired to `supabase.auth.signOut()`.
+- [x] `app/page.tsx` checks for an existing session on load, so a returning/just-confirmed admin lands in the app instead of the marketing page.
+- [ ] Add a minimal "current school" context: after login, fetch the user's `school_memberships` row (+ joined `schools` and current `academic_years`), and pass school name / academic year down instead of the hardcoded "Excellence Bilingual Academy" / "2026/2027" currently baked into `app-shell.tsx`'s sidebar. **This is the one Phase 1 item still open** — everything above is done and manually verified end-to-end (sign up → confirmation email → click link → workspace created → landed in the app).
 
 ---
 
