@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Eye, EyeOff, School2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, Eye, EyeOff, Mail, School2 } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 import type { SchoolProfile } from "@/lib/types";
 
 const initial: SchoolProfile = {
@@ -35,6 +36,32 @@ function validateStep(step: number, profile: SchoolProfile, password: string, co
   return e;
 }
 
+// Everything create_school_workspace() needs, attached to the not-yet-confirmed
+// auth user as metadata. Read back out of the session in app/auth/callback/route.ts
+// once the confirmation link is clicked, since there's no session to call the RPC with before then.
+function buildPendingSchool(profile: SchoolProfile) {
+  return {
+    school_name: profile.name,
+    school_type: profile.type,
+    country: profile.country,
+    region: profile.region,
+    city: profile.city,
+    address: profile.address,
+    school_phone: profile.phone,
+    school_email: profile.email,
+    school_website: profile.website,
+    timezone: profile.timezone,
+    curriculum: profile.curriculum,
+    estimated_students: profile.studentCount,
+    admin_full_name: profile.adminName,
+    admin_phone: profile.adminPhone,
+    admin_job_title: profile.adminRole,
+    academic_year_name: profile.academicYear,
+    working_days_count: profile.teachingDays === "Monday – Saturday" ? 6 : 5,
+    levels: profile.levels,
+  };
+}
+
 function Field({ label, required, error, hint, wide, children }: { label: string; required?: boolean; error?: string; hint?: string; wide?: boolean; children: React.ReactNode }) {
   return (
     <label className={[error && "invalid", wide && "span-2"].filter(Boolean).join(" ") || undefined}>
@@ -53,17 +80,50 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
   const [confirmPassword, setConfirmPassword] = useState("");
   const [show, setShow] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [signinEmail, setSigninEmail] = useState("");
+  const [signinPassword, setSigninPassword] = useState("");
+  const [signinError, setSigninError] = useState("");
 
   const update = (k: keyof SchoolProfile, v: string | string[]) => setProfile(p => ({ ...p, [k]: v }));
 
   const goToStep = (n: number) => { setErrors({}); setStep(n); };
 
-  const next = () => {
+  const next = async () => {
     const stepErrors = validateStep(step, profile, password, confirmPassword);
     if (Object.keys(stepErrors).length) { setErrors(stepErrors); return; }
     setErrors({});
-    if (step < 4) setStep(step + 1);
-    else { toast.success("School workspace created"); onComplete(); }
+    if (step < 4) { setStep(step + 1); return; }
+
+    const supabase = createClient();
+    if (!supabase) { toast.error("Supabase isn't configured — check .env.local"); return; }
+
+    setSubmitting(true);
+    const { error } = await supabase.auth.signUp({
+      email: profile.adminEmail,
+      password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        data: { full_name: profile.adminName, pending_school: buildPendingSchool(profile) },
+      },
+    });
+    setSubmitting(false);
+
+    if (error) { toast.error(error.message); return; }
+    setAwaitingConfirmation(true);
+  };
+
+  const signIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const supabase = createClient();
+    if (!supabase) { toast.error("Supabase isn't configured — check .env.local"); return; }
+    setSigninError("");
+    setSubmitting(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: signinEmail, password: signinPassword });
+    setSubmitting(false);
+    if (error) { setSigninError(error.message); return; }
+    onComplete();
   };
 
   if (mode === "signin") return (
@@ -75,16 +135,32 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
       </div>
       <div className="auth-form-wrap">
         <button className="back-link" onClick={onBack}><ArrowLeft /> Back to home</button>
-        <form className="auth-form" onSubmit={e => { e.preventDefault(); onComplete(); }}>
+        <form className="auth-form" onSubmit={signIn}>
           <h2>Sign in</h2>
           <p>Enter your school administrator account.</p>
-          <label>Email address<input type="email" placeholder="admin@school.com" required /></label>
-          <label>Password<div className="password"><input type={show ? "text" : "password"} placeholder="••••••••" required /><button type="button" onClick={() => setShow(!show)}>{show ? <EyeOff /> : <Eye />}</button></div></label>
+          <label>Email address<input type="email" value={signinEmail} onChange={e => setSigninEmail(e.target.value)} placeholder="admin@school.com" required /></label>
+          <label>Password<div className="password"><input type={show ? "text" : "password"} value={signinPassword} onChange={e => setSigninPassword(e.target.value)} placeholder="••••••••" required /><button type="button" onClick={() => setShow(!show)}>{show ? <EyeOff /> : <Eye />}</button></div></label>
+          {signinError && <small className="field-error">{signinError}</small>}
           <div className="form-row"><label className="check"><input type="checkbox" /> Remember me</label><button type="button" className="text-btn">Forgot password?</button></div>
-          <button className="btn primary full">Sign in <ArrowRight /></button>
+          <button className="btn primary full" disabled={submitting}>{submitting ? "Signing in…" : <>Sign in <ArrowRight /></>}</button>
           <p className="center">New school? <button type="button" className="text-btn" onClick={() => setMode("signup")}>Create an account</button></p>
         </form>
       </div>
+    </div>
+  );
+
+  if (awaitingConfirmation) return (
+    <div className="onboarding">
+      <header>
+        <div className="brand"><span className="brand-mark"><CalendarDays /></span>TimetableFlow</div>
+      </header>
+      <section className="setup-card confirm-card">
+        <div className="setup-icon success"><Mail /></div>
+        <h1>Check your email</h1>
+        <p>We sent a confirmation link to <b>{profile.adminEmail}</b>. Click it to activate your account — your school workspace gets created the moment you confirm.</p>
+        <div className="success-box review-note"><Check /><div><b>Didn't get it?</b><p>Check spam, or go back and try signing up again in a minute.</p></div></div>
+        <footer><button className="btn ghost" onClick={onBack}><ArrowLeft /> Back to home</button></footer>
+      </section>
     </div>
   );
 
@@ -251,7 +327,7 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
         </>}
         <footer>
           <button className="btn ghost" onClick={() => { setErrors({}); step === 1 ? onBack() : setStep(step - 1); }}><ArrowLeft /> {step === 1 ? "Cancel" : "Back"}</button>
-          <button className="btn primary" onClick={next}>{step === 4 ? "Create school workspace" : "Continue"}<ArrowRight /></button>
+          <button className="btn primary" onClick={next} disabled={submitting}>{submitting ? "Creating workspace…" : <>{step === 4 ? "Create school workspace" : "Continue"}<ArrowRight /></>}</button>
         </footer>
       </section>
     </div>

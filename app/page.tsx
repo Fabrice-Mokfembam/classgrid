@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, Clock3,
   FileCheck2, Grip, GripVertical, Layers, LockKeyhole, Menu, School2, ShieldCheck,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { AuthScreen } from "@/components/auth-screen";
 import { AppShell } from "@/components/app-shell";
+import { createClient } from "@/lib/supabase/client";
 
 const CAPABILITIES = [
   { icon: Clock3, title: "Academic schedule", text: "Define teaching days, lesson periods and breaks once — every other screen builds on it." },
@@ -50,6 +51,18 @@ const FAQS = [
 export default function Home() {
   const [screen, setScreen] = useState<"landing" | "auth" | "app">("landing");
   const [navOpen, setNavOpen] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) { setCheckingSession(false); return; }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setScreen("app");
+      setCheckingSession(false);
+    });
+  }, []);
+
+  if (checkingSession) return <div className="app-loading"><CalendarDays /></div>;
   if (screen === "auth") return <AuthScreen onComplete={() => setScreen("app")} onBack={() => setScreen("landing")} />;
   if (screen === "app") return <AppShell onLogout={() => setScreen("landing")} />;
 
