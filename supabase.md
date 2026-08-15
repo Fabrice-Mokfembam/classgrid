@@ -53,7 +53,6 @@ NEXT_PUBLIC_SUPABASE_URL=https://umcgtihssveztszgaepe.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_SERVICE_ROLE_KEY=...
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_DEMO_MODE=true
 ```
 
 Two gotchas we actually hit setting this up, worth knowing about so you don't repeat them:
@@ -61,7 +60,7 @@ Two gotchas we actually hit setting this up, worth knowing about so you don't re
 1. **The file must be named exactly `.env.local`** (leading dot). Next.js silently ignores anything else — a file literally named `env.local` (no dot) gets read by nothing and just sits there looking like it should work.
 2. **Key naming has two generations.** Newer Supabase projects issue a `sb_publishable_...` key and call it the "publishable key." Older projects (and most existing docs/tutorials) call the equivalent thing the "anon key" (`NEXT_PUBLIC_SUPABASE_ANON_KEY`). Both work — `lib/supabase/client.ts` and `lib/supabase/server.ts` check `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` first and fall back to `NEXT_PUBLIC_SUPABASE_ANON_KEY` — but if you paste a key under the wrong variable name entirely, `createClient()` just returns `null` with no error, and things fail silently downstream. If Supabase calls aren't working, check this first.
 
-`NEXT_PUBLIC_DEMO_MODE` and `NEXT_PUBLIC_APP_URL` are read from `.env.example` by convention but nothing in the code currently checks `NEXT_PUBLIC_DEMO_MODE` — see the note in §1.
+There used to be a `NEXT_PUBLIC_DEMO_MODE` flag here too — it was removed (along with the "Demo mode" badge it was meant to drive) because nothing in the code ever actually read it. The UI still runs on sample data from `lib/demo-data.ts` regardless; that's controlled by which components get wired to `createClient()` (see §1), not by an env flag.
 
 ---
 

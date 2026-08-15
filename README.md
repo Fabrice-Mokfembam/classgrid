@@ -1,6 +1,6 @@
 # TimetableFlow MVP
 
-A commercial multi-school timetable platform built with Next.js, TypeScript and Supabase. The current app runs immediately in demo mode, so you can review the complete interface before connecting a database.
+A commercial multi-school timetable platform built with Next.js, TypeScript and Supabase. The UI currently runs on sample data (see `NEXT_STEPS.md`) so the full interface can be reviewed before it's wired up to the live database.
 
 ## Included
 
@@ -27,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The application is currently in demo mode and does not need a database.
+Open `http://localhost:3000`. The UI runs on sample data, so no database connection is required to browse it.
 
 ## 2. Create the Supabase database later
 
@@ -71,13 +71,12 @@ Set:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Project Settings > API Keys > publishable key (older projects call this the anon/public key — `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works)
 - `SUPABASE_SERVICE_ROLE_KEY`: Project Settings > API Keys > secret/service role key (server only)
 - `NEXT_PUBLIC_APP_URL`: your local or deployed URL
-- `NEXT_PUBLIC_DEMO_MODE=false` once the real queries are connected
 
 Never commit `.env.local` or expose the service-role key in browser code.
 
 ## 4. What remains when Supabase is ready
 
-The supplied UI currently uses realistic demo records. After you add credentials, connect each form and table to Supabase in this order:
+The supplied UI currently uses realistic sample records from `lib/demo-data.ts`. After you add credentials, connect each form and table to Supabase in this order:
 
 1. Auth sign-up/sign-in and `create_school_workspace` RPC
 2. Current school and academic-year context

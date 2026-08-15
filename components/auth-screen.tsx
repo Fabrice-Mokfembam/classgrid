@@ -63,7 +63,7 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
     if (Object.keys(stepErrors).length) { setErrors(stepErrors); return; }
     setErrors({});
     if (step < 4) setStep(step + 1);
-    else { toast.success("School workspace created in demo mode"); onComplete(); }
+    else { toast.success("School workspace created"); onComplete(); }
   };
 
   if (mode === "signin") return (

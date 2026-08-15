@@ -22,8 +22,8 @@ None of that is a criticism of the current state — it's an accurate MVP-demo s
 
 ## Phase 0 — Foundation (do this first, it's cheap insurance)
 
-- [ ] `git init`, first commit. There is currently no history — a bad `rm` or a botched find-and-replace right now loses everything with no way back.
-- [ ] Decide what `NEXT_PUBLIC_DEMO_MODE` should actually control, or remove it from `.env.example` if it's not going to gate anything in code. Right now it's documented but never read.
+- [x] `git init`, first commit, pushed to [github.com/Fabrice-Mokfembam/classgrid](https://github.com/Fabrice-Mokfembam/classgrid).
+- [x] Removed the unused `NEXT_PUBLIC_DEMO_MODE` flag and the "Demo mode" badge it drove — neither was ever read/wired to anything. The UI still runs on `lib/demo-data.ts`; that's a Phase 2 problem, not an env-flag one.
 
 ---
 
