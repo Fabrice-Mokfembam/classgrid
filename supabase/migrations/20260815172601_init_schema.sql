@@ -1,4 +1,4 @@
--- TimetableFlow MVP database schema
+-- ClassGrid MVP database schema
 -- Run this entire file once in Supabase Dashboard > SQL Editor.
 
 create extension if not exists "pgcrypto";

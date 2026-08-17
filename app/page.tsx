@@ -9,6 +9,7 @@ import {
 import { AuthScreen } from "@/components/auth-screen";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/client";
+import { SchoolProvider } from "@/lib/school-context";
 
 const CAPABILITIES = [
   { icon: Clock3, title: "Academic schedule", text: "Define teaching days, lesson periods and breaks once — every other screen builds on it." },
@@ -56,20 +57,24 @@ export default function Home() {
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) { setCheckingSession(false); return; }
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setScreen("app");
-      setCheckingSession(false);
-    });
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        if (data.user) setScreen("app");
+      })
+      .catch((error) => {
+        console.error("Failed to check session:", error);
+      })
+      .finally(() => setCheckingSession(false));
   }, []);
 
   if (checkingSession) return <div className="app-loading"><CalendarDays /></div>;
   if (screen === "auth") return <AuthScreen onComplete={() => setScreen("app")} onBack={() => setScreen("landing")} />;
-  if (screen === "app") return <AppShell onLogout={() => setScreen("landing")} />;
+  if (screen === "app") return <SchoolProvider><AppShell onLogout={() => setScreen("landing")} /></SchoolProvider>;
 
   return (
     <main className="landing">
       <nav className="landing-nav">
-        <div className="brand"><span className="brand-mark"><CalendarDays size={20} /></span>TimetableFlow</div>
+        <div className="brand"><span className="brand-mark"><CalendarDays size={20} /></span>ClassGrid</div>
         <div className="nav-links">
           <a href="#capabilities">Capabilities</a>
           <a href="#how">How it works</a>
@@ -133,11 +138,11 @@ export default function Home() {
         </div>
         <div className="compare-grid">
           <div className="compare-card without">
-            <h3>Without TimetableFlow</h3>
+            <h3>Without ClassGrid</h3>
             <ul>{WITHOUT.map(t => <li key={t}><X /> {t}</li>)}</ul>
           </div>
           <div className="compare-card with">
-            <h3>With TimetableFlow</h3>
+            <h3>With ClassGrid</h3>
             <ul>{WITH.map(t => <li key={t}><CheckCircle2 /> {t}</li>)}</ul>
           </div>
         </div>
@@ -215,7 +220,7 @@ export default function Home() {
       <footer className="site-footer">
         <div className="footer-top">
           <div className="footer-brand">
-            <div className="brand"><span className="brand-mark"><CalendarDays size={20} /></span>TimetableFlow</div>
+            <div className="brand"><span className="brand-mark"><CalendarDays size={20} /></span>ClassGrid</div>
             <p>Conflict-free school timetabling for multi-school administrators.</p>
           </div>
           <div className="footer-cols">
@@ -225,7 +230,7 @@ export default function Home() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 TimetableFlow.</span>
+          <span>© 2026 ClassGrid.</span>
           <span>Built for the people who actually build the timetable.</span>
         </div>
       </footer>

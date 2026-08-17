@@ -129,7 +129,7 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
   if (mode === "signin") return (
     <div className="auth-layout">
       <div className="auth-brand">
-        <div className="brand light"><span className="brand-mark"><CalendarDays /></span>TimetableFlow</div>
+        <div className="brand light"><span className="brand-mark"><CalendarDays /></span>ClassGrid</div>
         <div><span className="auth-kicker">WELCOME BACK</span><h1>Your whole school week, under control.</h1><p>Sign in to continue configuring, generating and publishing your timetables.</p></div>
         <small>Conflict-free by design.</small>
       </div>
@@ -152,7 +152,7 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
   if (awaitingConfirmation) return (
     <div className="onboarding">
       <header>
-        <div className="brand"><span className="brand-mark"><CalendarDays /></span>TimetableFlow</div>
+        <div className="brand"><span className="brand-mark"><CalendarDays /></span>ClassGrid</div>
       </header>
       <section className="setup-card confirm-card">
         <div className="setup-icon success"><Mail /></div>
@@ -167,7 +167,7 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
   return (
     <div className="onboarding">
       <header>
-        <div className="brand"><span className="brand-mark"><CalendarDays /></span>TimetableFlow</div>
+        <div className="brand"><span className="brand-mark"><CalendarDays /></span>ClassGrid</div>
         <button className="btn ghost" onClick={() => setMode("signin")}>Already registered? Sign in</button>
       </header>
       <div className="stepper">

@@ -1,4 +1,4 @@
-# TimetableFlow MVP
+# ClassGrid MVP
 
 A commercial multi-school timetable platform built with Next.js, TypeScript and Supabase. The UI currently runs on sample data (see `NEXT_STEPS.md`) so the full interface can be reviewed before it's wired up to the live database.
 
