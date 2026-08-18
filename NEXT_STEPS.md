@@ -61,19 +61,21 @@ For each one: replace the import from `lib/demo-data` with a real fetch, add a l
 
 This is the one piece with genuine algorithmic risk — budget it as its own multi-day effort, not a quick task.
 
-- [ ] Build a constraint/backtracking solver as a server route (per the README's "Timetable engine direction"), taking `teaching_assignments` + `teacher_availability` + `period_slots` as input
-- [ ] Enforce the four rules already promised on the landing page and in the in-app "Generate" screen: no teacher clashes, no class clashes, availability respected, balanced distribution
-- [ ] Write results to `generation_runs`, `timetable_entries`, and `constraint_issues` (all three tables exist and are shaped for exactly this)
-- [ ] Replace the fake `setTimeout` + canned "186 lessons, 0 conflicts" toast in `Generate()` (`app-shell.tsx`) with a real call and real numbers
+- [x] Built a TypeScript constraint/backtracking solver (`lib/generation/solver.ts`) run from a real server route (`app/api/generate/route.ts`), taking `teaching_assignments` + `teacher_availability` + `period_slots` as input. MRV-ordered unit placement with bounded backtracking (~100k node / ~8s budget) — if the budget runs out or a subset genuinely can't be placed, the run still completes with a partial schedule rather than failing outright; whatever's left over is reported honestly (see below), not silently dropped.
+- [x] Enforces the four promised rules: no teacher clashes, no class clashes, availability respected (defaults to available when no override row exists, matching the Availability screen), and balanced distribution (via least-loaded-day value ordering, not a hard constraint). Also enforces `max_per_day`, `max_periods_per_day`, `max_consecutive_periods`, and treats `prefer_morning` as a soft preference. Double periods are stored as two separate `timetable_entries` rows at consecutive `period_slot_id`s (not one row with `duration_slots=2`) — this is what keeps the DB's own uniqueness constraints protecting both halves.
+- [x] Writes real `generation_runs`, `timetable_entries`, and `constraint_issues` rows. Unscheduled periods become hard `constraint_issues` explaining which assignment and how many periods; `prefer_morning` violations become soft ones. `timetables.quality_score` is a real `scheduled/required` computation, not fabricated.
+- [x] `Generate()` (`app-shell.tsx`) now shows real pre-flight counts and calls the real route instead of a `setTimeout` + canned toast.
 
 ---
 
 ## Phase 4 — Make the timetable editor persist
 
-- [ ] Load real `timetable_entries` for the selected class / teacher / master view instead of the generated `lessons` demo array
-- [ ] Drag-and-drop swap writes to the database, respecting the two `unique()` constraints already in the schema (`timetable_id,class_section_id,working_day_id,period_slot_id` and `timetable_id,teacher_id,working_day_id,period_slot_id`) — let the database be the final word on conflicts, don't just trust client-side state
-- [ ] Lock/unlock toggle persists `is_locked`
-- [ ] "Regenerate unlocked" re-runs the Phase 3 engine but holds locked entries fixed
+- [x] `Timetable()` loads real `timetable_entries` for Class, Teacher, and Master views (Master aggregates every class into the same grid, stacking multiple lesson chips in a cell when classes overlap).
+- [x] Drag-and-drop writes to the database. A plain move to an empty cell is a normal `.update()`, letting Postgres's own unique constraints reject cross-class teacher conflicts (surfaced as a toast, not assumed to succeed). A drop onto an occupied cell calls a new `swap_timetable_entries` RPC (`supabase/migrations/20260818005042_swap_timetable_entries.sql`) that deletes-and-reinserts both rows in one atomic statement — a plain two-step update would transiently violate the table's own uniqueness mid-swap. Locked lessons aren't draggable, and the RPC rejects locked entries server-side too as a second line of defense. Editing (drag + lock) is intentionally Class-view-only; Teacher/Master stay read-only lenses.
+- [x] Lock/unlock toggle persists `is_locked` for real (`.lock-toggle` in the inspector), verified to survive a page reload.
+- [x] "Regenerate unlocked" re-runs the Phase 3 solver in place on the existing timetable: locked entries are left untouched and fed to the solver as already-placed (`SolverInput.preplaced`), only unlocked entries are deleted and replaced, and the timetable's `quality_score` is recomputed from `(locked + newly placed) / total required`.
+
+Still fake/untouched, deliberately out of this phase's scope: the "Validate" button, "Publish timetable", and Dashboard's stats/progress ring.
 
 ---
 

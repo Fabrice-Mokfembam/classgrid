@@ -1,22 +1,21 @@
 "use client";
 import { useCallback,useEffect,useMemo,useState } from "react";
-import { AlertTriangle,ArrowRight,BookOpen,CalendarDays,Check,CheckCircle2,ChevronDown,Clock3,Download,FileCheck2,GripVertical,LayoutDashboard,LockKeyhole,LogOut,Menu,Plus,RefreshCw,School2,Search,Settings,ShieldCheck,Sparkles,Trash2,UnlockKeyhole,UserRound,UsersRound,X } from "lucide-react";
+import { AlertTriangle,ArrowRight,BookOpen,CalendarDays,Check,CheckCircle2,ChevronDown,Clock3,Download,FileCheck2,GripVertical,LayoutDashboard,LockKeyhole,LogOut,Menu,Plus,RefreshCw,School2,Search,Settings,ShieldCheck,Sparkles,UnlockKeyhole,UserRound,UsersRound,X } from "lucide-react";
 import { toast } from "sonner";
-import { days,lessons as initialLessons,periods } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
-import type { ClassSection,Lesson,Level,PeriodSlot,SchedulePeriod,SchoolSubject,SchoolTeacher,TeachingAssignment,WorkingDay } from "@/lib/types";
+import type { ClassSection,GenerationSummary,Level,PeriodSlot,SchedulePeriod,SchoolSubject,SchoolTeacher,TeachingAssignment,TimetableEntry,WorkingDay } from "@/lib/types";
 
 type Page="dashboard"|"setup"|"levels"|"subjects"|"teachers"|"availability"|"assignments"|"generate"|"timetable"|"settings";
 const nav=[{id:"dashboard",label:"Dashboard",icon:LayoutDashboard},{id:"setup",label:"School schedule",icon:Clock3},{id:"levels",label:"Levels & classes",icon:School2},{id:"subjects",label:"Subjects",icon:BookOpen},{id:"teachers",label:"Teachers",icon:UsersRound},{id:"availability",label:"Availability",icon:CalendarDays},{id:"assignments",label:"Teaching assignments",icon:FileCheck2},{id:"generate",label:"Generate timetable",icon:Sparkles},{id:"timetable",label:"Timetables",icon:CalendarDays},{id:"settings",label:"School settings",icon:Settings}] as const;
 const titles:Record<Page,[string,string]>={dashboard:["Good morning, Administrator","Here’s what’s happening with your timetable setup."],setup:["School schedule","Define your teaching days, lesson periods and breaks."],levels:["Levels & classes","Create broad levels and the actual class sections that receive timetables."],subjects:["Subjects","Manage the subjects offered by your school."],teachers:["Teachers","Manage teacher profiles and review their workloads."],availability:["Teacher availability","Set when each teacher can be scheduled for lessons."],assignments:["Teaching assignments","Connect each teacher, subject and class with its weekly lesson requirement."],generate:["Generate timetable","Validate your school data before creating a conflict-free timetable."],timetable:["Timetable editor","Review, move, lock and publish generated lessons."],settings:["School settings","Manage the profile and account details printed on school timetables."]};
 
 export function AppShell({onLogout}:{onLogout:()=>void}){
- const [page,setPage]=useState<Page>("dashboard"); const [mobile,setMobile]=useState(false); const [lessonList,setLessonList]=useState(initialLessons); const [selected,setSelected]=useState<Lesson|null>(initialLessons[12]); const [dragged,setDragged]=useState<Lesson|null>(null); const [generated,setGenerated]=useState(true);
+ const [page,setPage]=useState<Page>("dashboard"); const [mobile,setMobile]=useState(false);
  const {schoolName,academicYearName,loading:schoolLoading}=useSchool();
  const go=(p:Page)=>{setPage(p);setMobile(false)};
  return <div className="app-shell"><aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><span className="brand-mark"><CalendarDays/></span>ClassGrid<button className="mobile-close" onClick={()=>setMobile(false)}><X/></button></div><div className="school-switch"><span><School2/></span><div><b>{schoolLoading?"Loading…":schoolName??"Your school"}</b><small>{academicYearName??""}</small></div><ChevronDown/></div><nav>{nav.map(n=><button key={n.id} className={page===n.id?"nav-item active":"nav-item"} onClick={()=>go(n.id)}><n.icon/>{n.label}{n.id==="generate"&&<span className="nav-dot"/>}</button>)}</nav><div className="sidebar-bottom"><div className="setup-mini"><b>Setup progress <span>82%</span></b><div className="progress"><i style={{width:"82%"}}/></div><small>6 of 7 steps completed</small></div><button className="nav-item" onClick={async()=>{const supabase=createClient();if(supabase)await supabase.auth.signOut();onLogout()}}><LogOut/> Sign out</button></div></aside>{mobile&&<div className="scrim" onClick={()=>setMobile(false)}/>}<div className="app-main"><header className="topbar"><button className="menu-btn" onClick={()=>setMobile(true)}><Menu/></button><div className="crumb">School workspace <span>/</span> {titles[page][0]}</div><div className="top-actions"><button className="icon-btn"><Search/></button><div className="avatar">GA</div><div className="admin-name"><b>Grace Admin</b><small>School Administrator</small></div></div></header><main className="workspace"><div className="page-heading"><div><h1>{titles[page][0]}</h1><p>{titles[page][1]}</p></div>{page==="timetable"&&<div className="heading-actions"><button className="btn"><Download/> Export</button><button className="btn primary" onClick={()=>toast.success("Timetable published")}>Publish timetable</button></div>}</div>
- {page==="dashboard"&&<Dashboard go={go}/>} {page==="setup"&&<Schedule/>} {page==="levels"&&<Levels/>} {page==="subjects"&&<Subjects/>} {page==="teachers"&&<Teachers/>} {page==="availability"&&<Availability/>} {page==="assignments"&&<Assignments/>} {page==="generate"&&<Generate generated={generated} run={()=>{toast.promise(new Promise(r=>setTimeout(r,1200)),{loading:"Generating timetable…",success:"186 lessons scheduled with no hard conflicts",error:"Generation failed"});setGenerated(true);setTimeout(()=>go("timetable"),1450)}}/>} {page==="timetable"&&<Timetable lessonList={lessonList} setLessonList={setLessonList} selected={selected} setSelected={setSelected} dragged={dragged} setDragged={setDragged}/>} {page==="settings"&&<SettingsPage/>}
+ {page==="dashboard"&&<Dashboard go={go}/>} {page==="setup"&&<Schedule/>} {page==="levels"&&<Levels/>} {page==="subjects"&&<Subjects/>} {page==="teachers"&&<Teachers/>} {page==="availability"&&<Availability/>} {page==="assignments"&&<Assignments/>} {page==="generate"&&<Generate onGenerated={()=>go("timetable")}/>} {page==="timetable"&&<Timetable/>} {page==="settings"&&<SettingsPage/>}
  </main></div></div>;
 }
 
@@ -757,7 +756,286 @@ function AssignmentModal({ mode, initial, teacherOptions, subjectOptions, classO
     <footer><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "assignment"}`}</button></footer>
   </form></div>;
 }
-function Generate({run}:{generated:boolean;run:()=>void}){return <div className="generate-layout"><section className="panel generate-card"><div className="generate-title"><span><Sparkles/></span><div><h2>Ready to generate</h2><p>We checked the active 2026/2027 configuration across all 12 classes.</p></div></div><div className="generation-summary"><div><span>Classes</span><b>12</b></div><div><span>Teaching assignments</span><b>164</b></div><div><span>Weekly lessons</span><b>186</b></div><div><span>Available slots</span><b>480</b></div></div><div className="check-list"><ValidationItem good title="School structure" text="5 days, 8 periods and 2 breaks configured"/><ValidationItem good title="Teacher availability" text="Every teacher has enough compatible slots"/><ValidationItem good title="Teaching assignments" text="All active classes have assigned subjects"/><ValidationItem good title="Double periods" text="12 requirements have compatible consecutive slots"/><ValidationItem good={false} title="Soft preferences" text="3 preferences may not be fully satisfied"/></div><button className="btn primary huge" onClick={run}><Sparkles/> Generate conflict-free timetable</button><p className="center muted">Generation runs on the server. You can safely leave this page and return later.</p></section><aside className="panel rules-card"><h3>Rules being enforced</h3><div><LockKeyhole/><span><b>No teacher clashes</b><small>A teacher is only in one class at a time.</small></span></div><div><LockKeyhole/><span><b>No class clashes</b><small>A class receives one lesson per period.</small></span></div><div><LockKeyhole/><span><b>Availability respected</b><small>Unavailable slots are never used.</small></span></div><div><Sparkles/><span><b>Balanced distribution</b><small>Lessons are spread through the week.</small></span></div></aside></div>}
+function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void }) {
+  const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [classCount, setClassCount] = useState(0);
+  const [teacherCount, setTeacherCount] = useState(0);
+  const [assignmentCount, setAssignmentCount] = useState(0);
+  const [weeklyLessons, setWeeklyLessons] = useState(0);
+  const [dayCount, setDayCount] = useState(0);
+  const [lessonPeriodCount, setLessonPeriodCount] = useState(0);
 
-function Timetable({lessonList,setLessonList,selected,setSelected,dragged,setDragged}:{lessonList:Lesson[];setLessonList:any;selected:Lesson|null;setSelected:any;dragged:Lesson|null;setDragged:any}){const lookup=useMemo(()=>new Map(lessonList.map(x=>[`${x.day}-${x.period}`,x])),[lessonList]);const drop=(day:string,period:number)=>{if(!dragged)return;const target=lookup.get(`${day}-${period}`);if(target?.locked){toast.error("This lesson is locked and cannot be replaced");setDragged(null);return}setLessonList((all:Lesson[])=>all.map(x=>x.id===dragged.id?{...x,day,period}:target&&x.id===target.id?{...x,day:dragged.day,period:dragged.period}:x));setSelected({...dragged,day,period});setDragged(null);toast.success("Lesson moved — no hard conflicts")};return <div className="timetable-layout"><section className="panel timetable-main"><div className="tt-toolbar"><div className="segmented"><button className="active">Class</button><button>Teacher</button><button>Master</button></div><select><option>Form 2A</option><option>Form 1A</option></select><button className="btn" onClick={()=>toast.success("No hard conflicts found")}><ShieldCheck/> Validate</button><button className="btn"><RefreshCw/> Regenerate unlocked</button></div><div className="score-row"><span><b>92</b>/100 Quality</span><span className="good"><CheckCircle2/> <b>0</b> hard conflicts</span><span className="warn"><AlertTriangle/> <b>3</b> soft warnings</span><span><CalendarDays/> <b>186/186</b> scheduled</span><small><GripVertical/> Drag lessons to reschedule</small></div><div className="tt-grid"><div className="tt-head">Period</div>{days.map(d=><div className="tt-head" key={d}>{d}</div>)}{periods.flatMap(p=>[<div className="tt-period" key={`p-${p.n}`}><b>Period {p.n}</b><small>{p.time}</small></div>,...days.map(day=>{const l=lookup.get(`${day}-${p.n}`);return <div className={dragged&&dragged.id===l?.id?"tt-cell dragging":"tt-cell"} key={`${day}-${p.n}`} onDragOver={e=>e.preventDefault()} onDrop={()=>drop(day,p.n)}>{l&&<button draggable onDragStart={()=>setDragged(l)} onClick={()=>setSelected(l)} className={`lesson ${l.color} ${selected?.id===l.id?"selected":""}`}><span><b>{l.subject}</b><small>{l.teacher}</small></span>{l.locked?<LockKeyhole/>:<GripVertical/>}</button>}</div>})])}</div></section><aside className="panel inspector">{selected?<><div className="inspector-head"><div><span>Selected lesson</span><h3>{selected.subject}</h3><p>{selected.className}</p></div><button className="icon-btn" onClick={()=>setSelected(null)}><X/></button></div><div className="detail-list"><span>Teacher <b>{selected.teacher}</b></span><span>Current slot <b>{selected.day}, Period {selected.period}</b></span><span>Duration <b>Single period</b></span></div><button className="lock-toggle" onClick={()=>{setLessonList((a:Lesson[])=>a.map(l=>l.id===selected.id?{...l,locked:!l.locked}:l));setSelected({...selected,locked:!selected.locked})}}>{selected.locked?<LockKeyhole/>:<UnlockKeyhole/>}<span><b>{selected.locked?"Lesson locked":"Lesson unlocked"}</b><small>{selected.locked?"Regeneration will keep this slot.":"Regeneration may move this lesson."}</small></span><i className={selected.locked?"switch on":"switch"}/></button><div className="success-box"><CheckCircle2/><div><b>No hard conflicts</b><p>This lesson is valid in its current position.</p></div></div><div className="warning-box"><AlertTriangle/><div><b>Soft distribution warning</b><p>{selected.subject} appears twice on {selected.day}.</p></div></div><button className="btn danger full"><Trash2/> Remove from timetable</button></>:<div className="empty-inspector"><CalendarDays/><h3>Select a lesson</h3><p>View its rules, lock it or inspect warnings.</p></div>}</aside></div>}
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase || !schoolId || !academicYearId) { setLoading(false); return; }
+    setLoading(true);
+    const [classesRes, teachersRes, assignmentsRes, daysRes, periodsRes] = await Promise.all([
+      supabase.from("class_sections").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("status", "active"),
+      supabase.from("teachers").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "active"),
+      supabase.from("teaching_assignments").select("periods_per_week").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("status", "active"),
+      supabase.from("working_days").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true),
+      supabase.from("period_slots").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson"),
+    ]);
+    setClassCount(classesRes.count ?? 0);
+    setTeacherCount(teachersRes.count ?? 0);
+    const assignmentRows = assignmentsRes.data ?? [];
+    setAssignmentCount(assignmentRows.length);
+    setWeeklyLessons(assignmentRows.reduce((sum, a) => sum + a.periods_per_week, 0));
+    setDayCount(daysRes.count ?? 0);
+    setLessonPeriodCount(periodsRes.count ?? 0);
+    setLoading(false);
+  }, [schoolId, academicYearId]);
+
+  useEffect(() => { if (!schoolLoading) load(); }, [schoolLoading, load]);
+
+  const availableSlots = dayCount * lessonPeriodCount;
+  const scheduleReady = dayCount > 0 && lessonPeriodCount > 0;
+  const assignmentsReady = assignmentCount > 0;
+  const capacityReady = availableSlots >= weeklyLessons;
+  const canGenerate = scheduleReady && assignmentsReady && !generating;
+
+  async function run() {
+    if (!schoolId || !academicYearId) return;
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schoolId, academicYearId }) });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Generation failed"); return; }
+      const summary = data as GenerationSummary;
+      toast.success(summary.hardConflicts > 0
+        ? `${summary.scheduled} of ${summary.totalRequired} lessons scheduled — ${summary.hardConflicts} assignment(s) could not be fully placed`
+        : `${summary.scheduled} lessons scheduled with no hard conflicts`);
+      onGenerated(summary.timetableId);
+    } catch {
+      toast.error("Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (loading) return <p className="muted">Loading…</p>;
+
+  return <div className="generate-layout">
+    <section className="panel generate-card">
+      <div className="generate-title"><span><Sparkles/></span><div><h2>Ready to generate</h2><p>We checked the active configuration across all {classCount} classes.</p></div></div>
+      <div className="generation-summary">
+        <div><span>Classes</span><b>{classCount}</b></div>
+        <div><span>Teaching assignments</span><b>{assignmentCount}</b></div>
+        <div><span>Weekly lessons</span><b>{weeklyLessons}</b></div>
+        <div><span>Available slots</span><b>{availableSlots}</b></div>
+      </div>
+      <div className="check-list">
+        <ValidationItem good={scheduleReady} title="School structure" text={scheduleReady ? `${dayCount} teaching days and ${lessonPeriodCount} lesson periods configured` : "Set up teaching days and lesson periods on School schedule first"}/>
+        <ValidationItem good={teacherCount > 0} title="Teachers" text={teacherCount > 0 ? `${teacherCount} active teachers` : "No active teachers yet"}/>
+        <ValidationItem good={assignmentsReady} title="Teaching assignments" text={assignmentsReady ? `${assignmentCount} active assignments` : "No teaching assignments yet"}/>
+        <ValidationItem good={capacityReady} title="Capacity" text={capacityReady ? "Enough weekly slots for the required lessons" : `Only ${availableSlots} slots available for ${weeklyLessons} required lessons`}/>
+      </div>
+      <button className="btn primary huge" onClick={run} disabled={!canGenerate}><Sparkles/> {generating ? "Generating…" : "Generate conflict-free timetable"}</button>
+      <p className="center muted">Generation runs on the server. You can safely leave this page and return later.</p>
+    </section>
+    <aside className="panel rules-card">
+      <h3>Rules being enforced</h3>
+      <div><LockKeyhole/><span><b>No teacher clashes</b><small>A teacher is only in one class at a time.</small></span></div>
+      <div><LockKeyhole/><span><b>No class clashes</b><small>A class receives one lesson per period.</small></span></div>
+      <div><LockKeyhole/><span><b>Availability respected</b><small>Unavailable slots are never used.</small></span></div>
+      <div><Sparkles/><span><b>Balanced distribution</b><small>Lessons are spread through the week.</small></span></div>
+    </aside>
+  </div>;
+}
+
+function Timetable() {
+  const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
+  const [loading, setLoading] = useState(true);
+  const [workingDays, setWorkingDays] = useState<WorkingDay[]>([]);
+  const [periodSlots, setPeriodSlots] = useState<PeriodSlot[]>([]);
+  const [classOptions, setClassOptions] = useState<{ id: string; name: string }[]>([]);
+  const [teacherOptions, setTeacherOptions] = useState<{ id: string; name: string }[]>([]);
+  const [classSectionId, setClassSectionId] = useState("");
+  const [teacherId, setTeacherId] = useState("");
+  const [view, setView] = useState<"class" | "teacher" | "master">("class");
+  const [timetableInfo, setTimetableInfo] = useState<{ id: string; version: number; qualityScore: number | null } | null>(null);
+  const [entries, setEntries] = useState<TimetableEntry[]>([]);
+  const [selected, setSelected] = useState<TimetableEntry | null>(null);
+  const [dragged, setDragged] = useState<TimetableEntry | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase || !schoolId || !academicYearId) { setLoading(false); return; }
+    setLoading(true);
+    const [daysRes, slotsRes, classesRes, teachersRes, timetableRes] = await Promise.all([
+      supabase.from("working_days").select("id, name, sort_order").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true).order("sort_order"),
+      supabase.from("period_slots").select("id, name, period_number, start_time, end_time").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson").order("sort_order"),
+      supabase.from("class_sections").select("id, name").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("status", "active").order("name"),
+      supabase.from("teachers").select("id, full_name").eq("school_id", schoolId).eq("status", "active").order("full_name"),
+      supabase.from("timetables").select("id, version, quality_score").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("version", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    setWorkingDays((daysRes.data ?? []).map((d): WorkingDay => ({ id: d.id, name: d.name, sortOrder: d.sort_order })));
+    setPeriodSlots((slotsRes.data ?? []).map((p): PeriodSlot => ({ id: p.id, name: p.name, periodNumber: p.period_number, startTime: p.start_time, endTime: p.end_time })));
+    setClassOptions(classesRes.data ?? []);
+    setTeacherOptions((teachersRes.data ?? []).map(t => ({ id: t.id, name: t.full_name })));
+    setTimetableInfo(timetableRes.data ? { id: timetableRes.data.id, version: timetableRes.data.version, qualityScore: timetableRes.data.quality_score } : null);
+    setLoading(false);
+  }, [schoolId, academicYearId]);
+
+  useEffect(() => { if (!schoolLoading) load(); }, [schoolLoading, load]);
+  useEffect(() => { if (!classSectionId && classOptions.length) setClassSectionId(classOptions[0].id); }, [classOptions, classSectionId]);
+  useEffect(() => { if (!teacherId && teacherOptions.length) setTeacherId(teacherOptions[0].id); }, [teacherOptions, teacherId]);
+
+  const loadEntries = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase || !timetableInfo) { setEntries([]); return; }
+    if (view === "class" && !classSectionId) { setEntries([]); return; }
+    if (view === "teacher" && !teacherId) { setEntries([]); return; }
+    let query = supabase.from("timetable_entries")
+      .select("id, working_day_id, period_slot_id, is_locked, subjects(name, color), teachers(full_name), class_sections(name)")
+      .eq("timetable_id", timetableInfo.id);
+    if (view === "class") query = query.eq("class_section_id", classSectionId);
+    if (view === "teacher") query = query.eq("teacher_id", teacherId);
+    const { data } = await query;
+    setEntries((data ?? []).map((e): TimetableEntry => {
+      const subject = Array.isArray(e.subjects) ? e.subjects[0] : e.subjects;
+      const teacher = Array.isArray(e.teachers) ? e.teachers[0] : e.teachers;
+      const classRow = Array.isArray(e.class_sections) ? e.class_sections[0] : e.class_sections;
+      return {
+        id: e.id, dayId: e.working_day_id, periodSlotId: e.period_slot_id, isLocked: e.is_locked,
+        subjectName: (subject as { name: string } | null)?.name ?? "—", subjectColor: (subject as { color: string } | null)?.color ?? "#3b82f6",
+        teacherName: (teacher as { full_name: string } | null)?.full_name ?? "—", className: (classRow as { name: string } | null)?.name ?? "—",
+      };
+    }));
+    setSelected(null);
+  }, [timetableInfo, view, classSectionId, teacherId]);
+
+  useEffect(() => { loadEntries(); }, [loadEntries]);
+
+  const cells = useMemo(() => {
+    const map = new Map<string, TimetableEntry[]>();
+    for (const e of entries) {
+      const key = `${e.dayId}-${e.periodSlotId}`;
+      map.set(key, [...(map.get(key) ?? []), e]);
+    }
+    return map;
+  }, [entries]);
+
+  async function toggleLock() {
+    if (!selected) return;
+    const next = !selected.isLocked;
+    const supabase = createClient();
+    if (!supabase) return;
+    const { error } = await supabase.from("timetable_entries").update({ is_locked: next }).eq("id", selected.id);
+    if (error) { toast.error(error.message); return; }
+    setEntries(list => list.map(e => e.id === selected.id ? { ...e, isLocked: next } : e));
+    setSelected(s => s ? { ...s, isLocked: next } : s);
+    toast.success(next ? "Lesson locked" : "Lesson unlocked");
+  }
+
+  async function handleDrop(dayId: string, periodId: string) {
+    if (!dragged) return;
+    const dragSnapshot = dragged;
+    setDragged(null);
+    const target = (cells.get(`${dayId}-${periodId}`) ?? [])[0];
+    if (target?.id === dragSnapshot.id) return;
+    if (target?.isLocked) { toast.error("This lesson is locked and cannot be replaced"); return; }
+    const supabase = createClient();
+    if (!supabase) return;
+    if (target) {
+      const { error } = await supabase.rpc("swap_timetable_entries", { p_entry_a: dragSnapshot.id, p_entry_b: target.id });
+      if (error) {
+        const message = error.code === "23505" ? "That slot conflicts with an existing lesson for this teacher elsewhere in the timetable"
+          : error.message.includes("locked") ? "This lesson is locked and cannot be replaced" : error.message;
+        toast.error(message);
+        return;
+      }
+      toast.success("Lessons swapped");
+    } else {
+      const { error } = await supabase.from("timetable_entries").update({ working_day_id: dayId, period_slot_id: periodId }).eq("id", dragSnapshot.id);
+      if (error) { toast.error(error.code === "23505" ? "That slot conflicts with an existing lesson for this teacher or class" : error.message); return; }
+      toast.success("Lesson moved");
+    }
+    loadEntries();
+  }
+
+  async function regenerateUnlocked() {
+    if (!schoolId || !academicYearId || !timetableInfo) return;
+    setRegenerating(true);
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schoolId, academicYearId, timetableId: timetableInfo.id }) });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Regeneration failed"); return; }
+      const summary = data as GenerationSummary;
+      toast.success(summary.hardConflicts > 0
+        ? `${summary.scheduled} of ${summary.totalRequired} lessons scheduled — ${summary.hardConflicts} assignment(s) could not be fully placed`
+        : `${summary.scheduled} lessons scheduled with no hard conflicts`);
+      setTimetableInfo(info => info ? { ...info, qualityScore: summary.qualityScore } : info);
+      loadEntries();
+    } catch {
+      toast.error("Regeneration failed");
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  if (loading) return <p className="muted">Loading…</p>;
+  if (!timetableInfo) return <div className="empty-inspector"><CalendarDays/><h3>No timetable generated yet</h3><p>Head to Generate timetable to create the first draft.</p></div>;
+  if (workingDays.length === 0 || periodSlots.length === 0) return <div className="empty-inspector"><CalendarDays/><h3>School schedule not configured</h3><p>Set up teaching days and lesson periods first.</p></div>;
+
+  return <div className="timetable-layout">
+    <section className="panel timetable-main">
+      <div className="tt-toolbar">
+        <div className="segmented">
+          <button className={view === "class" ? "active" : ""} onClick={() => setView("class")}>Class</button>
+          <button className={view === "teacher" ? "active" : ""} onClick={() => setView("teacher")}>Teacher</button>
+          <button className={view === "master" ? "active" : ""} onClick={() => setView("master")}>Master</button>
+        </div>
+        {view === "class" && <select value={classSectionId} onChange={e => setClassSectionId(e.target.value)}>{classOptions.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select>}
+        {view === "teacher" && <select value={teacherId} onChange={e => setTeacherId(e.target.value)}>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select>}
+        <button className="btn" disabled title="Not built yet"><ShieldCheck/> Validate</button>
+        <button className="btn" onClick={regenerateUnlocked} disabled={regenerating}><RefreshCw/> {regenerating ? "Regenerating…" : "Regenerate unlocked"}</button>
+      </div>
+      <div className="score-row">
+        <span><b>{timetableInfo.qualityScore ?? "—"}</b>/100 Quality</span>
+        <span><CalendarDays/> <b>{entries.length}</b> lessons scheduled</span>
+        <small>Version {timetableInfo.version} {view === "class" ? "· Drag a lesson to reschedule" : "· Read-only view"}</small>
+      </div>
+      <div className="tt-grid">
+        <div className="tt-head">Period</div>
+        {workingDays.map(d => <div className="tt-head" key={d.id}>{d.name}</div>)}
+        {periodSlots.flatMap(p => [
+          <div className="tt-period" key={`p-${p.id}`}><b>{p.name}</b><small>{p.startTime.slice(0, 5)} – {p.endTime.slice(0, 5)}</small></div>,
+          ...workingDays.map(d => {
+            const cellEntries = cells.get(`${d.id}-${p.id}`) ?? [];
+            if (view === "master") {
+              return <div className="tt-cell" key={`${d.id}-${p.id}`} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                {cellEntries.map(e => <button key={e.id} onClick={() => setSelected(e)} className={`lesson ${selected?.id === e.id ? "selected" : ""}`} style={{ borderLeft: `4px solid ${e.subjectColor}` }}>
+                  <span><b>{e.className}</b><small>{e.subjectName} · {e.teacherName}</small></span>{e.isLocked && <LockKeyhole/>}
+                </button>)}
+              </div>;
+            }
+            const e = cellEntries[0];
+            return <div className={dragged && dragged.id === e?.id ? "tt-cell dragging" : "tt-cell"} key={`${d.id}-${p.id}`}
+              onDragOver={view === "class" ? ev => ev.preventDefault() : undefined}
+              onDrop={view === "class" ? () => handleDrop(d.id, p.id) : undefined}>
+              {e && <button draggable={view === "class" && !e.isLocked} onDragStart={() => setDragged(e)} onClick={() => setSelected(e)} className={`lesson ${selected?.id === e.id ? "selected" : ""}`} style={{ borderLeft: `4px solid ${e.subjectColor}` }}>
+                <span><b>{e.subjectName}</b><small>{view === "teacher" ? e.className : e.teacherName}</small></span>{e.isLocked && <LockKeyhole/>}
+              </button>}
+            </div>;
+          }),
+        ])}
+      </div>
+    </section>
+    <aside className="panel inspector">
+      {selected ? <>
+        <div className="inspector-head"><div><span>Selected lesson</span><h3>{selected.subjectName}</h3><p>{selected.className}</p></div><button className="icon-btn" onClick={() => setSelected(null)}><X/></button></div>
+        <div className="detail-list"><span>Teacher <b>{selected.teacherName}</b></span></div>
+        <button className="lock-toggle" onClick={toggleLock}>
+          {selected.isLocked ? <LockKeyhole/> : <UnlockKeyhole/>}
+          <span><b>{selected.isLocked ? "Lesson locked" : "Lesson unlocked"}</b><small>{selected.isLocked ? "Regeneration will keep this slot." : "Regeneration may move this lesson."}</small></span>
+          <i className={selected.isLocked ? "switch on" : "switch"}/>
+        </button>
+      </> : <div className="empty-inspector"><CalendarDays/><h3>Select a lesson</h3><p>View its details.</p></div>}
+    </aside>
+  </div>;
+}
 function SettingsPage(){return <section className="panel form-panel"><div className="section-heading"><div><h3>School profile</h3><p>This information is kept inside your school workspace.</p></div><button className="btn primary" onClick={()=>toast.success("School profile saved")}>Save changes</button></div><div className="logo-upload"><span><School2/></span><div><b>School logo</b><p>PNG or JPG, maximum 2 MB</p><button className="btn">Upload logo</button></div></div><div className="form-grid wide"><label>School display name<input defaultValue="Excellence Bilingual Academy"/></label><label>Registered name<input defaultValue="Excellence Bilingual Academy Ltd."/></label><label>School type<select><option>Primary & Secondary School</option></select></label><label>Curriculum<input defaultValue="Cameroon National Curriculum"/></label><label>Country<input defaultValue="Cameroon"/></label><label>Region<input defaultValue="Littoral"/></label><label>City<input defaultValue="Douala"/></label><label>Timezone<select><option>Africa/Douala</option></select></label><label className="span-2">Physical address<input defaultValue="Bonamoussadi, Douala"/></label><label>School email<input defaultValue="admin@excellence.edu.cm"/></label><label>School phone<input defaultValue="+237 677 000 000"/></label></div></section>}
