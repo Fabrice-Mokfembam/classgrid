@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CalendarDays, Check, Eye, EyeOff, Mail, School2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { fetchMySchoolSlug } from "@/lib/school-context";
 import type { SchoolProfile } from "@/lib/types";
 
 const initial: SchoolProfile = {
@@ -72,7 +74,8 @@ function Field({ label, required, error, hint, wide, children }: { label: string
   );
 }
 
-export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onBack: () => void }) {
+export function AuthScreen({ onBack }: { onBack: () => void }) {
+  const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signup");
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState(initial);
@@ -121,9 +124,11 @@ export function AuthScreen({ onComplete, onBack }: { onComplete: () => void; onB
     setSigninError("");
     setSubmitting(true);
     const { error } = await supabase.auth.signInWithPassword({ email: signinEmail, password: signinPassword });
+    if (error) { setSubmitting(false); setSigninError(error.message); return; }
+    const slug = await fetchMySchoolSlug(supabase);
     setSubmitting(false);
-    if (error) { setSigninError(error.message); return; }
-    onComplete();
+    if (!slug) { setSigninError("Couldn't find a school workspace for this account."); return; }
+    router.push(`/${slug}`);
   };
 
   if (mode === "signin") return (

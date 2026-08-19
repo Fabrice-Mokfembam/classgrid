@@ -1,5 +1,7 @@
 "use client";
-import { useCallback,useEffect,useMemo,useState } from "react";
+import { Component,useCallback,useEffect,useMemo,useState,type ReactNode } from "react";
+import Link from "next/link";
+import { useParams,usePathname,useRouter } from "next/navigation";
 import { AlertTriangle,ArrowRight,BookOpen,CalendarDays,Check,CheckCircle2,ChevronDown,Clock3,Download,FileCheck2,GripVertical,LayoutDashboard,LockKeyhole,LogOut,Menu,Plus,RefreshCw,School2,Search,Settings,ShieldCheck,Sparkles,UnlockKeyhole,UserRound,UsersRound,X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -9,38 +11,97 @@ import type { ClassSection,GenerationSummary,Level,PeriodSlot,SchedulePeriod,Sch
 type Page="dashboard"|"setup"|"levels"|"subjects"|"teachers"|"availability"|"assignments"|"generate"|"timetable"|"settings";
 const nav=[{id:"dashboard",label:"Dashboard",icon:LayoutDashboard},{id:"setup",label:"School schedule",icon:Clock3},{id:"levels",label:"Levels & classes",icon:School2},{id:"subjects",label:"Subjects",icon:BookOpen},{id:"teachers",label:"Teachers",icon:UsersRound},{id:"availability",label:"Availability",icon:CalendarDays},{id:"assignments",label:"Teaching assignments",icon:FileCheck2},{id:"generate",label:"Generate timetable",icon:Sparkles},{id:"timetable",label:"Timetables",icon:CalendarDays},{id:"settings",label:"School settings",icon:Settings}] as const;
 const titles:Record<Page,[string,string]>={dashboard:["Good morning, Administrator","Here’s what’s happening with your timetable setup."],setup:["School schedule","Define your teaching days, lesson periods and breaks."],levels:["Levels & classes","Create broad levels and the actual class sections that receive timetables."],subjects:["Subjects","Manage the subjects offered by your school."],teachers:["Teachers","Manage teacher profiles and review their workloads."],availability:["Teacher availability","Set when each teacher can be scheduled for lessons."],assignments:["Teaching assignments","Connect each teacher, subject and class with its weekly lesson requirement."],generate:["Generate timetable","Validate your school data before creating a conflict-free timetable."],timetable:["Timetable editor","Review, move, lock and publish generated lessons."],settings:["School settings","Manage the profile and account details printed on school timetables."]};
+// URL for a given nav page, relative to the school's own root — dashboard lives at /<school>, everything else at /<school>/<page>.
+function pagePath(schoolSlug: string, id: Page) { return id === "dashboard" ? `/${schoolSlug}` : `/${schoolSlug}/${id}`; }
+// Which nav entry the current URL corresponds to, so the sidebar/heading stay in sync with the address bar.
+function pageFromPathname(pathname: string, schoolSlug: string): Page {
+  const rest = pathname.slice(`/${schoolSlug}`.length).replace(/^\//, "").split("/")[0];
+  return (nav.some(n => n.id === rest) ? rest : "dashboard") as Page;
+}
 
-export function AppShell({onLogout}:{onLogout:()=>void}){
- const [page,setPage]=useState<Page>("dashboard"); const [mobile,setMobile]=useState(false);
- const {schoolName,academicYearName,loading:schoolLoading}=useSchool();
- const go=(p:Page)=>{setPage(p);setMobile(false)};
- return <div className="app-shell"><aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><span className="brand-mark"><CalendarDays/></span>ClassGrid<button className="mobile-close" onClick={()=>setMobile(false)}><X/></button></div><div className="school-switch"><span><School2/></span><div><b>{schoolLoading?"Loading…":schoolName??"Your school"}</b><small>{academicYearName??""}</small></div><ChevronDown/></div><nav>{nav.map(n=><button key={n.id} className={page===n.id?"nav-item active":"nav-item"} onClick={()=>go(n.id)}><n.icon/>{n.label}{n.id==="generate"&&<span className="nav-dot"/>}</button>)}</nav><div className="sidebar-bottom"><div className="setup-mini"><b>Setup progress <span>82%</span></b><div className="progress"><i style={{width:"82%"}}/></div><small>6 of 7 steps completed</small></div><button className="nav-item" onClick={async()=>{const supabase=createClient();if(supabase)await supabase.auth.signOut();onLogout()}}><LogOut/> Sign out</button></div></aside>{mobile&&<div className="scrim" onClick={()=>setMobile(false)}/>}<div className="app-main"><header className="topbar"><button className="menu-btn" onClick={()=>setMobile(true)}><Menu/></button><div className="crumb">School workspace <span>/</span> {titles[page][0]}</div><div className="top-actions"><button className="icon-btn"><Search/></button><div className="avatar">GA</div><div className="admin-name"><b>Grace Admin</b><small>School Administrator</small></div></div></header><main className="workspace"><div className="page-heading"><div><h1>{titles[page][0]}</h1><p>{titles[page][1]}</p></div>{page==="timetable"&&<div className="heading-actions"><button className="btn"><Download/> Export</button><button className="btn primary" onClick={()=>toast.success("Timetable published")}>Publish timetable</button></div>}</div>
- {page==="dashboard"&&<Dashboard go={go}/>} {page==="setup"&&<Schedule/>} {page==="levels"&&<Levels/>} {page==="subjects"&&<Subjects/>} {page==="teachers"&&<Teachers/>} {page==="availability"&&<Availability/>} {page==="assignments"&&<Assignments/>} {page==="generate"&&<Generate onGenerated={()=>go("timetable")}/>} {page==="timetable"&&<Timetable/>} {page==="settings"&&<SettingsPage/>}
+// Reusable loading-skeleton / error-state primitives, shared by every data screen below.
+function Skel({ w, sm }: { w?: string; sm?: boolean }) {
+  return <span className={sm ? "skeleton skeleton-line sm" : "skeleton skeleton-line"} style={w ? { width: w } : undefined} />;
+}
+function RowsSkeleton({ className, cols, rows = 5 }: { className: string; cols: number; rows?: number }) {
+  return <>{Array.from({ length: rows }).map((_, r) => <div className={className} key={r}>{Array.from({ length: cols }).map((_, c) => <span key={c}><Skel w={c === 0 ? "65%" : "45%"} /></span>)}</div>)}</>;
+}
+function GridSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: number }) {
+  return <>{Array.from({ length: rows }).flatMap((_, r) => [
+    <div className="skeleton" key={`p-${r}`} style={{ minHeight: 57 }} />,
+    ...Array.from({ length: cols }).map((_, c) => <div className="skeleton" key={`${r}-${c}`} style={{ minHeight: 57 }} />),
+  ])}</>;
+}
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div className="empty-inspector error-inspector"><AlertTriangle/><h3>Couldn't load this page</h3><p>{message}</p><button className="btn" onClick={onRetry}>Try again</button></div>;
+}
+function firstError(...results: { error: { message: string } | null }[]) {
+  return results.find(r => r.error)?.error?.message ?? null;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error(error); }
+  render() {
+    if (this.state.error) return <ErrorState message={this.state.error.message || "This page hit an unexpected error."} onRetry={() => this.setState({ error: null })} />;
+    return this.props.children;
+  }
+}
+
+// Sidebar/topbar/error-boundary chrome, shared by every /<school>/* route (see app/[school]/layout.tsx).
+// The active nav item and page heading are derived from the URL itself, not local state,
+// so the address bar always matches what's on screen and a refresh lands back on the same page.
+export function AppShellChrome({schoolSlug,children}:{schoolSlug:string;children:ReactNode}){
+ const [mobile,setMobile]=useState(false);
+ const router=useRouter();
+ const pathname=usePathname();
+ const page=pageFromPathname(pathname,schoolSlug);
+ const {schoolId,schoolSlug:realSlug,schoolName,academicYearName,loading:schoolLoading,error:schoolError,retry:schoolRetry}=useSchool();
+ // The URL's slug is taken on faith by the server guard (see app/[school]/school-gate.tsx) so navigation
+ // never blocks on a DB round trip; once the real membership loads client-side, correct a stale/wrong one here.
+ useEffect(()=>{
+   if(schoolLoading||schoolError) return;
+   if(!schoolId){ router.replace("/auth"); return; }
+   if(realSlug&&realSlug!==schoolSlug) router.replace(pathname.replace(`/${schoolSlug}`,`/${realSlug}`));
+ },[schoolLoading,schoolError,schoolId,realSlug,schoolSlug,pathname,router]);
+ if(schoolError) return <div className="app-shell" style={{display:"grid",placeItems:"center"}}><ErrorState message={schoolError} onRetry={schoolRetry}/></div>;
+ return <div className="app-shell"><aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><span className="brand-mark"><CalendarDays/></span>ClassGrid<button className="mobile-close" onClick={()=>setMobile(false)}><X/></button></div><div className="school-switch"><span><School2/></span><div><b>{schoolLoading?<Skel w="80px"/>:schoolName??"Your school"}</b><small>{schoolLoading?<Skel w="50px"/>:academicYearName??""}</small></div><ChevronDown/></div><nav>{nav.map(n=><Link key={n.id} href={pagePath(schoolSlug,n.id)} className={page===n.id?"nav-item active":"nav-item"} onClick={()=>setMobile(false)}><n.icon/>{n.label}{n.id==="generate"&&<span className="nav-dot"/>}</Link>)}</nav><div className="sidebar-bottom"><div className="setup-mini"><b>Setup progress <span>82%</span></b><div className="progress"><i style={{width:"82%"}}/></div><small>6 of 7 steps completed</small></div><button className="nav-item" onClick={async()=>{if(!window.confirm("Sign out of ClassGrid?"))return;const supabase=createClient();if(supabase)await supabase.auth.signOut();router.push("/")}}><LogOut/> Sign out</button></div></aside>{mobile&&<div className="scrim" onClick={()=>setMobile(false)}/>}<div className="app-main"><header className="topbar"><button className="menu-btn" onClick={()=>setMobile(true)}><Menu/></button><div className="crumb">School workspace <span>/</span> {titles[page][0]}</div><div className="top-actions"><button className="icon-btn"><Search/></button><div className="avatar">GA</div><div className="admin-name"><b>Grace Admin</b><small>School Administrator</small></div></div></header><main className="workspace"><div className="page-heading"><div><h1>{titles[page][0]}</h1><p>{titles[page][1]}</p></div></div>
+ <ErrorBoundary key={pathname}>
+ {children}
+ </ErrorBoundary>
  </main></div></div>;
 }
 
-function Dashboard({go}:{go:(p:Page)=>void}){return <><section className="setup-banner"><div className="ring"><span>82%</span></div><div><b>Complete your school setup</b><p>Add the remaining teaching assignments to get the best generation results.</p><div className="progress"><i style={{width:"82%"}}/></div><small>6 of 7 steps completed</small></div><button className="btn primary" onClick={()=>go("assignments")}>Continue setup <ArrowRight/></button></section><section className="stats-grid"><Stat icon={UsersRound} n="24" label="Teachers" note="All active"/><Stat icon={School2} n="12" label="Classes" note="Across 5 levels"/><Stat icon={BookOpen} n="18" label="Subjects" note="2 practical subjects"/><Stat icon={CalendarDays} n="186" label="Weekly lessons" note="All assigned"/></section><section className="dashboard-grid"><article className="panel workload"><PanelTitle title="Weekly workload" action="View report"/><div className="bars">{[32,45,48,42,38].map((n,i)=><div key={n}><span style={{height:`${n*2.4}px`}}><b>{n}</b></span><small>{["Mon","Tue","Wed","Thu","Fri"][i]}</small></div>)}</div></article><article className="panel status-card"><PanelTitle title="Timetable status"/><div className="status-content"><div className="ring small"><span>92</span></div><div><span className="status-pill">Draft · Version 3</span><h3>Ready for review</h3><p>186 of 186 lessons scheduled.</p></div></div><button className="btn full" onClick={()=>go("timetable")}>Open timetable editor <ArrowRight/></button></article><article className="panel validation"><PanelTitle title="Validation summary" action="View details"/><p className="validation-head"><span className="status-pill warning">3 items need attention</span></p><ValidationItem good={false} title="Soft preferences" text="3 distribution warnings"/><ValidationItem good title="Hard conflicts" text="No blocking conflicts"/><ValidationItem good title="Availability" text="Every workload is feasible"/></article></section><section className="panel quick"><PanelTitle title="Quick actions"/><div className="quick-grid"><Quick icon={UsersRound} text="Add teacher" onClick={()=>go("teachers")}/><Quick icon={School2} text="Add class" onClick={()=>go("levels")}/><Quick icon={FileCheck2} text="Add assignment" onClick={()=>go("assignments")}/><Quick icon={Sparkles} text="Generate timetable" onClick={()=>go("generate")}/></div></section></>}
+export function Dashboard(){
+  const router=useRouter();
+  const {school}=useParams<{school:string}>();
+  const go=(p:Page)=>router.push(pagePath(school,p));
+  return <><section className="setup-banner"><div className="ring"><span>82%</span></div><div><b>Complete your school setup</b><p>Add the remaining teaching assignments to get the best generation results.</p><div className="progress"><i style={{width:"82%"}}/></div><small>6 of 7 steps completed</small></div><button className="btn primary" onClick={()=>go("assignments")}>Continue setup <ArrowRight/></button></section><section className="stats-grid"><Stat icon={UsersRound} n="24" label="Teachers" note="All active"/><Stat icon={School2} n="12" label="Classes" note="Across 5 levels"/><Stat icon={BookOpen} n="18" label="Subjects" note="2 practical subjects"/><Stat icon={CalendarDays} n="186" label="Weekly lessons" note="All assigned"/></section><section className="dashboard-grid"><article className="panel workload"><PanelTitle title="Weekly workload" action="View report"/><div className="bars">{[32,45,48,42,38].map((n,i)=><div key={n}><span style={{height:`${n*2.4}px`}}><b>{n}</b></span><small>{["Mon","Tue","Wed","Thu","Fri"][i]}</small></div>)}</div></article><article className="panel status-card"><PanelTitle title="Timetable status"/><div className="status-content"><div className="ring small"><span>92</span></div><div><span className="status-pill">Draft · Version 3</span><h3>Ready for review</h3><p>186 of 186 lessons scheduled.</p></div></div><button className="btn full" onClick={()=>go("timetable")}>Open timetable editor <ArrowRight/></button></article><article className="panel validation"><PanelTitle title="Validation summary" action="View details"/><p className="validation-head"><span className="status-pill warning">3 items need attention</span></p><ValidationItem good={false} title="Soft preferences" text="3 distribution warnings"/><ValidationItem good title="Hard conflicts" text="No blocking conflicts"/><ValidationItem good title="Availability" text="Every workload is feasible"/></article></section><section className="panel quick"><PanelTitle title="Quick actions"/><div className="quick-grid"><Quick icon={UsersRound} text="Add teacher" onClick={()=>go("teachers")}/><Quick icon={School2} text="Add class" onClick={()=>go("levels")}/><Quick icon={FileCheck2} text="Add assignment" onClick={()=>go("assignments")}/><Quick icon={Sparkles} text="Generate timetable" onClick={()=>go("generate")}/></div></section></>}
 function Stat({icon:Icon,n,label,note}:{icon:any;n:string;label:string;note:string}){return <article className="stat-card"><span><Icon/></span><div><b>{n}</b><strong>{label}</strong><small>{note}</small></div></article>};
 function PanelTitle({title,action}:{title:string;action?:string}){return <div className="panel-title"><h3>{title}</h3>{action&&<button>{action}<ArrowRight/></button>}</div>};
 function ValidationItem({good,title,text}:{good:boolean;title:string;text:string}){return <div className="validation-item">{good?<CheckCircle2 className="good"/>:<AlertTriangle className="warn"/>}<div><b>{title}</b><small>{text}</small></div><ArrowRight/></div>};
 function Quick({icon:Icon,text,onClick}:{icon:any;text:string;onClick:()=>void}){return <button onClick={onClick}><Icon/><b>{text}</b><ArrowRight/></button>}
 
-function Schedule(){
+export function Schedule(){
   const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
   const [workingDays, setWorkingDays] = useState<WorkingDay[]>([]);
   const [periodList, setPeriodList] = useState<SchedulePeriod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [periodModal, setPeriodModal] = useState<{ mode: "add" } | { mode: "edit"; period: SchedulePeriod } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) { setWorkingDays([]); setPeriodList([]); setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [daysRes, slotsRes] = await Promise.all([
       supabase.from("working_days").select("id, name, weekday, sort_order, is_active").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("sort_order"),
       supabase.from("period_slots").select("id, name, kind, start_time, end_time, period_number, sort_order").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("sort_order"),
     ]);
+    const err = firstError(daysRes, slotsRes);
+    if (err) { setLoadError(err); setLoading(false); return; }
     setWorkingDays((daysRes.data ?? []).map((d): WorkingDay => ({ id: d.id, name: d.name, weekday: d.weekday, sortOrder: d.sort_order, isActive: d.is_active })));
     setPeriodList((slotsRes.data ?? []).map((p): SchedulePeriod => ({ id: p.id, name: p.name, kind: p.kind, startTime: p.start_time, endTime: p.end_time, periodNumber: p.period_number, sortOrder: p.sort_order })));
     setLoading(false);
@@ -103,7 +164,7 @@ function Schedule(){
     load();
   }
 
-  if (loading) return <p className="muted">Loading…</p>;
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
 
   const activeDaysCount = workingDays.filter(d => d.isActive).length;
   const lessonCount = periodList.filter(p => p.kind === "lesson").length;
@@ -112,11 +173,11 @@ function Schedule(){
     <section className="panel form-panel">
       <div className="section-heading"><div><h3>Weekly structure</h3><p>These slots form the grid used by the generation engine.</p></div></div>
       <div className="field-row">
-        <label>Teaching days<select value={sixDayWeek ? "6" : "5"} onChange={e => setTeachingDays(e.target.value === "6")}><option value="5">Monday – Friday</option><option value="6">Monday – Saturday</option></select></label>
+        <label>Teaching days{loading ? <Skel w="100%"/> : <select value={sixDayWeek ? "6" : "5"} onChange={e => setTeachingDays(e.target.value === "6")}><option value="5">Monday – Friday</option><option value="6">Monday – Saturday</option></select>}</label>
       </div>
       <div className="period-list">
         <div className="period-row head"><span>Type</span><span>Name</span><span>Start</span><span>End</span><span></span></div>
-        {periodList.map(p => <div className={`period-row ${p.kind === "break" ? "break" : ""}`} key={p.id}>
+        {loading ? <RowsSkeleton className="period-row" cols={4} rows={5}/> : periodList.map(p => <div className={`period-row ${p.kind === "break" ? "break" : ""}`} key={p.id}>
           <span className="drag"><GripVertical/></span>
           <span><b>{p.name}</b><small>{p.kind === "break" ? "Break" : "Lesson"}</small></span>
           <input value={p.startTime.slice(0, 5)} readOnly/>
@@ -132,7 +193,7 @@ function Schedule(){
             </>}
           </div>
         </div>)}
-        {periodList.length === 0 && <p className="muted" style={{ padding: "16px 0" }}>No periods or breaks configured yet.</p>}
+        {!loading && periodList.length === 0 && <p className="muted" style={{ padding: "16px 0" }}>No periods or breaks configured yet.</p>}
       </div>
       <button type="button" className="btn dashed" onClick={() => setPeriodModal({ mode: "add" })}><Plus/> Add period or break</button>
     </section>
@@ -161,11 +222,12 @@ function PeriodModal({ mode, initial, close, onSave }: { mode: "add" | "edit"; i
   </form></div>;
 }
 function TableShell({children,title,count,button,onAdd}:{children:React.ReactNode;title:string;count:number;button:string;onAdd:()=>void}){return <section className="panel table-panel"><div className="table-tools"><div><h3>{title}</h3><span>{count} records</span></div><div><div className="search"><Search/><input placeholder="Search…"/></div><button className="btn primary" onClick={onAdd}><Plus/> {button}</button></div></div>{children}</section>}
-function Levels(){
+export function Levels(){
   const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
   const [levels, setLevels] = useState<Level[]>([]);
   const [sections, setSections] = useState<ClassSection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [levelModal, setLevelModal] = useState<{ mode: "add" } | { mode: "edit"; level: Level } | null>(null);
   const [sectionModal, setSectionModal] = useState<{ mode: "add" } | { mode: "edit"; section: ClassSection } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -173,11 +235,13 @@ function Levels(){
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) { setLevels([]); setSections([]); setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [levelsRes, sectionsRes] = await Promise.all([
       supabase.from("levels").select("id, name, sort_order, status").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("sort_order"),
       supabase.from("class_sections").select("id, name, student_count, status, level_id, levels(name)").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("name"),
     ]);
+    const err = firstError(levelsRes, sectionsRes);
+    if (err) { setLoadError(err); setLoading(false); return; }
     setLevels((levelsRes.data ?? []).map((l): Level => ({ id: l.id, name: l.name, sortOrder: l.sort_order, status: l.status })));
     setSections((sectionsRes.data ?? []).map((s): ClassSection => {
       const levelRow = Array.isArray(s.levels) ? s.levels[0] : s.levels;
@@ -242,10 +306,12 @@ function Levels(){
     load();
   }
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
+
   return <div className="levels-page">
     <section className="panel form-panel">
       <div className="section-heading"><div><h3>Levels</h3><p>Broad groupings like Form 1 — every class section belongs to one.</p></div></div>
-      {loading ? <p className="muted">Loading…</p> : <div className="level-chips">
+      {loading ? <div className="level-chips">{Array.from({ length: 4 }).map((_, i) => <span className="skeleton" key={i} style={{ height: 36, width: 90, borderRadius: 99 }} />)}</div> : <div className="level-chips">
         {levels.map(l => <span className="level-chip" key={l.id}>
           <button type="button" className="level-chip-name" onClick={() => setLevelModal({ mode: "edit", level: l })}>{l.name}</button>
           <button type="button" aria-label={`Remove ${l.name}`} onClick={() => deleteLevel(l)}><X size={12} /></button>
@@ -255,7 +321,7 @@ function Levels(){
     </section>
 
     <TableShell title="Class sections" count={sections.length} button="Add class" onAdd={() => { if (levels.length === 0) { toast.error("Add a level first"); return; } setSectionModal({ mode: "add" }); }}>
-      {loading ? <p className="muted" style={{ padding: "20px" }}>Loading…</p> : sections.length === 0 ? (
+      {loading ? <div className="data-table"><div className="data-row head levels"><span>Class</span><span>Level</span><span>Students</span><span>Status</span><span></span></div><RowsSkeleton className="data-row levels" cols={4} rows={4}/></div> : sections.length === 0 ? (
         <div className="empty-inspector"><School2 /><h3>No class sections yet</h3><p>Add your first class section to get started.</p></div>
       ) : <div className="data-table">
         <div className="data-row head levels"><span>Class</span><span>Level</span><span>Students</span><span>Status</span><span></span></div>
@@ -308,18 +374,20 @@ function ClassSectionModal({ mode, initial, levels, close, onSave }: { mode: "ad
 }
 const SUBJECT_COLOR_PRESETS = ["#3b82f6","#8b5cf6","#22a06b","#f97362","#a855f7","#f59e0b"];
 
-function Subjects(){
+export function Subjects(){
   const { schoolId, loading: schoolLoading } = useSchool();
   const [subjectsList, setSubjectsList] = useState<SchoolSubject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [subjectModal, setSubjectModal] = useState<{ mode: "add" } | { mode: "edit"; subject: SchoolSubject } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId) { setSubjectsList([]); setLoading(false); return; }
-    setLoading(true);
-    const { data } = await supabase.from("subjects").select("id, name, code, color, status").eq("school_id", schoolId).order("name");
+    setLoading(true); setLoadError(null);
+    const { data, error } = await supabase.from("subjects").select("id, name, code, color, status").eq("school_id", schoolId).order("name");
+    if (error) { setLoadError(error.message); setLoading(false); return; }
     setSubjectsList((data ?? []).map((s): SchoolSubject => ({ id: s.id, name: s.name, code: s.code, color: s.color, status: s.status })));
     setLoading(false);
   }, [schoolId]);
@@ -353,8 +421,10 @@ function Subjects(){
     load();
   }
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
+
   return <TableShell title="All subjects" count={subjectsList.length} button="Add subject" onAdd={() => setSubjectModal({ mode: "add" })}>
-    {loading ? <p className="muted" style={{ padding: "20px" }}>Loading…</p> : subjectsList.length === 0 ? (
+    {loading ? <div className="data-table"><div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div><RowsSkeleton className="data-row subjects" cols={4} rows={5}/></div> : subjectsList.length === 0 ? (
       <div className="empty-inspector"><BookOpen /><h3>No subjects yet</h3><p>Add your first subject to get started.</p></div>
     ) : <div className="data-table">
       <div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div>
@@ -395,23 +465,26 @@ function SubjectModal({ mode, initial, close, onSave }: { mode: "add" | "edit"; 
     <footer><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "subject"}`}</button></footer>
   </form></div>;
 }
-function Teachers(){
+export function Teachers(){
   const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
   const [teachersList, setTeachersList] = useState<SchoolTeacher[]>([]);
   const [subjectOptions, setSubjectOptions] = useState<SchoolSubject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [teacherModal, setTeacherModal] = useState<{ mode: "add" } | { mode: "edit"; teacher: SchoolTeacher } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId) { setTeachersList([]); setSubjectOptions([]); setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [teachersRes, subjectsRes, linksRes] = await Promise.all([
       supabase.from("teachers").select("id, full_name, teacher_code, email, phone, status").eq("school_id", schoolId).order("full_name"),
       supabase.from("subjects").select("id, name, code, color, status").eq("school_id", schoolId).order("name"),
       supabase.from("teacher_subjects").select("teacher_id, subject_id, subjects(name)").eq("school_id", schoolId),
     ]);
+    const err0 = firstError(teachersRes, subjectsRes, linksRes);
+    if (err0) { setLoadError(err0); setLoading(false); return; }
     let requiredByTeacher = new Map<string, number>();
     let availableByTeacher = new Map<string, number>();
     if (academicYearId) {
@@ -419,6 +492,8 @@ function Teachers(){
         supabase.from("teaching_assignments").select("teacher_id, periods_per_week").eq("school_id", schoolId).eq("academic_year_id", academicYearId),
         supabase.from("teacher_availability").select("teacher_id").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_available", true),
       ]);
+      const err1 = firstError(assignmentsRes, availabilityRes);
+      if (err1) { setLoadError(err1); setLoading(false); return; }
       (assignmentsRes.data ?? []).forEach(a => requiredByTeacher.set(a.teacher_id, (requiredByTeacher.get(a.teacher_id) ?? 0) + a.periods_per_week));
       (availabilityRes.data ?? []).forEach(a => availableByTeacher.set(a.teacher_id, (availableByTeacher.get(a.teacher_id) ?? 0) + 1));
     }
@@ -484,8 +559,16 @@ function Teachers(){
     load();
   }
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
+
   return <TableShell title="Teaching staff" count={teachersList.length} button="Add teacher" onAdd={() => setTeacherModal({ mode: "add" })}>
-    {loading ? <p className="muted" style={{ padding: "20px" }}>Loading…</p> : teachersList.length === 0 ? (
+    {loading ? <div className="teacher-cards">{Array.from({ length: 3 }).map((_, i) => <article key={i}>
+      <div className="teacher-top"><span className="avatar large skeleton" style={{ boxShadow: "none" }}/></div>
+      <h3><Skel w="60%"/></h3>
+      <p><Skel w="80%"/></p>
+      <div className="load"><Skel w="100%"/><div className="progress"><i className="skeleton" style={{ width: "40%" }}/></div></div>
+      <footer><Skel w="50%"/></footer>
+    </article>)}</div> : teachersList.length === 0 ? (
       <div className="empty-inspector"><UsersRound /><h3>No teachers yet</h3><p>Add your first teacher to get started.</p></div>
     ) : <div className="teacher-cards">
       {teachersList.map(t => <article key={t.id}>
@@ -542,7 +625,7 @@ const DEFAULT_PERIODS = [
   { n: 7, start: "13:00", end: "13:45" }, { n: 8, start: "13:45", end: "14:30" },
 ];
 
-function Availability(){
+export function Availability(){
   const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
   const [workingDays, setWorkingDays] = useState<WorkingDay[]>([]);
   const [periodSlots, setPeriodSlots] = useState<PeriodSlot[]>([]);
@@ -550,18 +633,21 @@ function Availability(){
   const [teacherId, setTeacherId] = useState<string>("");
   const [availability, setAvailability] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) { setWorkingDays([]); setPeriodSlots([]); setTeachersList([]); setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [daysRes, slotsRes, teachersRes, assignmentsRes] = await Promise.all([
       supabase.from("working_days").select("id, name, sort_order").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true).order("sort_order"),
       supabase.from("period_slots").select("id, name, period_number, start_time, end_time").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson").order("sort_order"),
       supabase.from("teachers").select("id, full_name").eq("school_id", schoolId).order("full_name"),
       supabase.from("teaching_assignments").select("teacher_id, periods_per_week").eq("school_id", schoolId).eq("academic_year_id", academicYearId),
     ]);
+    const err = firstError(daysRes, slotsRes, teachersRes, assignmentsRes);
+    if (err) { setLoadError(err); setLoading(false); return; }
     setWorkingDays((daysRes.data ?? []).map((d): WorkingDay => ({ id: d.id, name: d.name, sortOrder: d.sort_order })));
     setPeriodSlots((slotsRes.data ?? []).map((p): PeriodSlot => ({ id: p.id, name: p.name, periodNumber: p.period_number, startTime: p.start_time, endTime: p.end_time })));
     const requiredByTeacher = new Map<string, number>();
@@ -577,7 +663,8 @@ function Availability(){
     async function loadAvailability() {
       const supabase = createClient();
       if (!supabase || !schoolId || !academicYearId || !teacherId) { setAvailability(new Map()); return; }
-      const { data } = await supabase.from("teacher_availability").select("working_day_id, period_slot_id, is_available").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("teacher_id", teacherId);
+      const { data, error } = await supabase.from("teacher_availability").select("working_day_id, period_slot_id, is_available").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("teacher_id", teacherId);
+      if (error) { toast.error(error.message); return; }
       const map = new Map<string, boolean>();
       (data ?? []).forEach(row => map.set(`${row.working_day_id}-${row.period_slot_id}`, row.is_available));
       setAvailability(map);
@@ -627,7 +714,11 @@ function Availability(){
   const teacher = teachersList.find(t => t.id === teacherId);
   const availableCount = workingDays.flatMap(d => periodSlots.map(p => availability.get(`${d.id}-${p.id}`) ?? true)).filter(Boolean).length;
 
-  if (loading) return <p className="muted">Loading…</p>;
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
+  if (loading) return <div className="availability-layout"><section className="panel availability-main">
+    <div className="availability-toolbar"><label>Teacher<span className="skeleton" style={{ height: 45, borderRadius: 8 }}/></label><div><small>Workload summary</small><Skel w="140px"/></div><button className="btn" disabled>Reset</button></div>
+    <div className="availability-grid"><div className="av-head">Period</div>{Array.from({ length: 5 }).map((_, i) => <div className="av-head" key={i}><Skel w="60%"/></div>)}<GridSkeleton rows={6} cols={5}/></div>
+  </section><aside className="panel teacher-side"><span className="avatar xlarge skeleton" style={{ boxShadow: "none" }}/><h3><Skel w="60%"/></h3></aside></div>;
   if (workingDays.length === 0) return <div className="empty-inspector"><CalendarDays /><h3>No teaching days configured</h3><p>Set up your school's teaching days first, on the School schedule page.</p></div>;
   if (periodSlots.length === 0) return <div className="empty-inspector"><CalendarDays /><h3>No lesson periods configured yet</h3><p>The availability grid needs lesson periods before it can be used.</p><button className="btn primary" onClick={seedDefaultPeriods} disabled={seeding}>{seeding ? "Setting up…" : "Use default schedule (8 periods)"}</button></div>;
   if (!teacher) return <div className="empty-inspector"><UsersRound /><h3>No teachers yet</h3><p>Add a teacher first to set their availability.</p></div>;
@@ -636,26 +727,29 @@ function Availability(){
 }
 const PATTERN_LABELS: Record<string, string> = { singles: "Singles", double: "Double", mixed: "Mixed" };
 
-function Assignments(){
+export function Assignments(){
   const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
   const [assignmentsList, setAssignmentsList] = useState<TeachingAssignment[]>([]);
   const [teacherOptions, setTeacherOptions] = useState<{ id: string; name: string }[]>([]);
   const [subjectOptions, setSubjectOptions] = useState<{ id: string; name: string }[]>([]);
   const [classOptions, setClassOptions] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [assignmentModal, setAssignmentModal] = useState<{ mode: "add" } | { mode: "edit"; assignment: TeachingAssignment } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) { setAssignmentsList([]); setTeacherOptions([]); setSubjectOptions([]); setClassOptions([]); setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [assignmentsRes, teachersRes, subjectsRes, classesRes] = await Promise.all([
       supabase.from("teaching_assignments").select("id, periods_per_week, pattern, status, teacher_id, subject_id, class_section_id, teachers(full_name), subjects(name), class_sections(name)").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("created_at"),
       supabase.from("teachers").select("id, full_name").eq("school_id", schoolId).order("full_name"),
       supabase.from("subjects").select("id, name").eq("school_id", schoolId).order("name"),
       supabase.from("class_sections").select("id, name").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("name"),
     ]);
+    const err = firstError(assignmentsRes, teachersRes, subjectsRes, classesRes);
+    if (err) { setLoadError(err); setLoading(false); return; }
     setAssignmentsList((assignmentsRes.data ?? []).map((a): TeachingAssignment => {
       const teacherRow = Array.isArray(a.teachers) ? a.teachers[0] : a.teachers;
       const subjectRow = Array.isArray(a.subjects) ? a.subjects[0] : a.subjects;
@@ -708,12 +802,14 @@ function Assignments(){
     load();
   }
 
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
+
   return <TableShell title="Teaching assignments" count={assignmentsList.length} button="Add assignment" onAdd={() => {
     if (teacherOptions.length === 0 || subjectOptions.length === 0 || classOptions.length === 0) { toast.error("Add a teacher, a subject and a class section first"); return; }
     setAssignmentModal({ mode: "add" });
   }}>
     <div className="info-banner"><ShieldCheck/><div><b>The assignment is the generator’s core input</b><span>It connects one teacher, subject and actual class with its weekly period requirement.</span></div></div>
-    {loading ? <p className="muted" style={{ padding: "20px" }}>Loading…</p> : assignmentsList.length === 0 ? (
+    {loading ? <div className="data-table"><div className="data-row head assignments"><span>Teacher</span><span>Subject</span><span>Class</span><span>Periods / week</span><span>Pattern</span><span></span></div><RowsSkeleton className="data-row assignments" cols={5} rows={5}/></div> : assignmentsList.length === 0 ? (
       <div className="empty-inspector"><FileCheck2 /><h3>No teaching assignments yet</h3><p>Add your first assignment to get started.</p></div>
     ) : <div className="data-table">
       <div className="data-row head assignments"><span>Teacher</span><span>Subject</span><span>Class</span><span>Periods / week</span><span>Pattern</span><span></span></div>
@@ -756,9 +852,12 @@ function AssignmentModal({ mode, initial, teacherOptions, subjectOptions, classO
     <footer><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "assignment"}`}</button></footer>
   </form></div>;
 }
-function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void }) {
+export function Generate() {
+  const router = useRouter();
+  const { school } = useParams<{ school: string }>();
   const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [classCount, setClassCount] = useState(0);
   const [teacherCount, setTeacherCount] = useState(0);
@@ -770,7 +869,7 @@ function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) { setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [classesRes, teachersRes, assignmentsRes, daysRes, periodsRes] = await Promise.all([
       supabase.from("class_sections").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("status", "active"),
       supabase.from("teachers").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("status", "active"),
@@ -778,6 +877,8 @@ function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void 
       supabase.from("working_days").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true),
       supabase.from("period_slots").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson"),
     ]);
+    const err = firstError(classesRes, teachersRes, assignmentsRes, daysRes, periodsRes);
+    if (err) { setLoadError(err); setLoading(false); return; }
     setClassCount(classesRes.count ?? 0);
     setTeacherCount(teachersRes.count ?? 0);
     const assignmentRows = assignmentsRes.data ?? [];
@@ -798,6 +899,7 @@ function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void 
 
   async function run() {
     if (!schoolId || !academicYearId) return;
+    if (!window.confirm("Generate a new conflict-free timetable now?")) return;
     setGenerating(true);
     try {
       const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schoolId, academicYearId }) });
@@ -807,7 +909,7 @@ function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void 
       toast.success(summary.hardConflicts > 0
         ? `${summary.scheduled} of ${summary.totalRequired} lessons scheduled — ${summary.hardConflicts} assignment(s) could not be fully placed`
         : `${summary.scheduled} lessons scheduled with no hard conflicts`);
-      onGenerated(summary.timetableId);
+      router.push(pagePath(school, "timetable"));
     } catch {
       toast.error("Generation failed");
     } finally {
@@ -815,24 +917,24 @@ function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void 
     }
   }
 
-  if (loading) return <p className="muted">Loading…</p>;
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
 
   return <div className="generate-layout">
     <section className="panel generate-card">
-      <div className="generate-title"><span><Sparkles/></span><div><h2>Ready to generate</h2><p>We checked the active configuration across all {classCount} classes.</p></div></div>
-      <div className="generation-summary">
+      <div className="generate-title"><span><Sparkles/></span><div><h2>Ready to generate</h2><p>{loading ? <Skel w="220px"/> : `We checked the active configuration across all ${classCount} classes.`}</p></div></div>
+      {loading ? <div className="generation-summary">{Array.from({ length: 4 }).map((_, i) => <div key={i}><span><Skel w="60%" sm/></span><Skel w="30%"/></div>)}</div> : <div className="generation-summary">
         <div><span>Classes</span><b>{classCount}</b></div>
         <div><span>Teaching assignments</span><b>{assignmentCount}</b></div>
         <div><span>Weekly lessons</span><b>{weeklyLessons}</b></div>
         <div><span>Available slots</span><b>{availableSlots}</b></div>
-      </div>
-      <div className="check-list">
+      </div>}
+      {loading ? <div className="check-list">{Array.from({ length: 4 }).map((_, i) => <div className="validation-item" key={i}><span className="skeleton" style={{ width: 18, height: 18, borderRadius: "50%" }}/><div><Skel w="140px"/></div></div>)}</div> : <div className="check-list">
         <ValidationItem good={scheduleReady} title="School structure" text={scheduleReady ? `${dayCount} teaching days and ${lessonPeriodCount} lesson periods configured` : "Set up teaching days and lesson periods on School schedule first"}/>
         <ValidationItem good={teacherCount > 0} title="Teachers" text={teacherCount > 0 ? `${teacherCount} active teachers` : "No active teachers yet"}/>
         <ValidationItem good={assignmentsReady} title="Teaching assignments" text={assignmentsReady ? `${assignmentCount} active assignments` : "No teaching assignments yet"}/>
         <ValidationItem good={capacityReady} title="Capacity" text={capacityReady ? "Enough weekly slots for the required lessons" : `Only ${availableSlots} slots available for ${weeklyLessons} required lessons`}/>
-      </div>
-      <button className="btn primary huge" onClick={run} disabled={!canGenerate}><Sparkles/> {generating ? "Generating…" : "Generate conflict-free timetable"}</button>
+      </div>}
+      <button className="btn primary huge" onClick={run} disabled={!canGenerate || loading}><Sparkles/> {generating ? "Generating…" : "Generate conflict-free timetable"}</button>
       <p className="center muted">Generation runs on the server. You can safely leave this page and return later.</p>
     </section>
     <aside className="panel rules-card">
@@ -845,8 +947,8 @@ function Generate({ onGenerated }: { onGenerated: (timetableId: string) => void 
   </div>;
 }
 
-function Timetable() {
-  const { schoolId, academicYearId, loading: schoolLoading } = useSchool();
+export function Timetable() {
+  const { schoolId, academicYearId, schoolName, academicYearName, loading: schoolLoading } = useSchool();
   const [loading, setLoading] = useState(true);
   const [workingDays, setWorkingDays] = useState<WorkingDay[]>([]);
   const [periodSlots, setPeriodSlots] = useState<PeriodSlot[]>([]);
@@ -860,11 +962,14 @@ function Timetable() {
   const [selected, setSelected] = useState<TimetableEntry | null>(null);
   const [dragged, setDragged] = useState<TimetableEntry | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [entriesError, setEntriesError] = useState<string | null>(null);
+  const [entriesLoading, setEntriesLoading] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) { setLoading(false); return; }
-    setLoading(true);
+    setLoading(true); setLoadError(null);
     const [daysRes, slotsRes, classesRes, teachersRes, timetableRes] = await Promise.all([
       supabase.from("working_days").select("id, name, sort_order").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true).order("sort_order"),
       supabase.from("period_slots").select("id, name, period_number, start_time, end_time").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson").order("sort_order"),
@@ -872,6 +977,8 @@ function Timetable() {
       supabase.from("teachers").select("id, full_name").eq("school_id", schoolId).eq("status", "active").order("full_name"),
       supabase.from("timetables").select("id, version, quality_score").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("version", { ascending: false }).limit(1).maybeSingle(),
     ]);
+    const err = firstError(daysRes, slotsRes, classesRes, teachersRes, timetableRes);
+    if (err) { setLoadError(err); setLoading(false); return; }
     setWorkingDays((daysRes.data ?? []).map((d): WorkingDay => ({ id: d.id, name: d.name, sortOrder: d.sort_order })));
     setPeriodSlots((slotsRes.data ?? []).map((p): PeriodSlot => ({ id: p.id, name: p.name, periodNumber: p.period_number, startTime: p.start_time, endTime: p.end_time })));
     setClassOptions(classesRes.data ?? []);
@@ -889,12 +996,14 @@ function Timetable() {
     if (!supabase || !timetableInfo) { setEntries([]); return; }
     if (view === "class" && !classSectionId) { setEntries([]); return; }
     if (view === "teacher" && !teacherId) { setEntries([]); return; }
+    setEntriesError(null); setEntriesLoading(true);
     let query = supabase.from("timetable_entries")
       .select("id, working_day_id, period_slot_id, is_locked, subjects(name, color), teachers(full_name), class_sections(name)")
       .eq("timetable_id", timetableInfo.id);
     if (view === "class") query = query.eq("class_section_id", classSectionId);
     if (view === "teacher") query = query.eq("teacher_id", teacherId);
-    const { data } = await query;
+    const { data, error } = await query;
+    if (error) { setEntriesError(error.message); setEntriesLoading(false); return; }
     setEntries((data ?? []).map((e): TimetableEntry => {
       const subject = Array.isArray(e.subjects) ? e.subjects[0] : e.subjects;
       const teacher = Array.isArray(e.teachers) ? e.teachers[0] : e.teachers;
@@ -906,6 +1015,7 @@ function Timetable() {
       };
     }));
     setSelected(null);
+    setEntriesLoading(false);
   }, [timetableInfo, view, classSectionId, teacherId]);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
@@ -959,6 +1069,7 @@ function Timetable() {
 
   async function regenerateUnlocked() {
     if (!schoolId || !academicYearId || !timetableInfo) return;
+    if (!window.confirm("Regenerate all unlocked lessons? Locked lessons will stay in place, but every other slot may move.")) return;
     setRegenerating(true);
     try {
       const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ schoolId, academicYearId, timetableId: timetableInfo.id }) });
@@ -977,11 +1088,40 @@ function Timetable() {
     }
   }
 
-  if (loading) return <p className="muted">Loading…</p>;
+  async function downloadPdf() {
+    const [{ jsPDF: JsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+    const subtitle = view === "master" ? "Master timetable — all classes"
+      : view === "teacher" ? `Teacher timetable — ${teacherOptions.find(t => t.id === teacherId)?.name ?? ""}`
+      : `Class timetable — ${classOptions.find(c => c.id === classSectionId)?.name ?? ""}`;
+    const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text(schoolName ?? "Timetable", 40, 40);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100);
+    doc.text(`${subtitle}${academicYearName ? ` · ${academicYearName}` : ""}`, 40, 58);
+    autoTable(doc, {
+      startY: 74,
+      head: [["Period", ...workingDays.map(d => d.name)]],
+      body: periodSlots.map(p => [
+        `${p.name}\n${p.startTime.slice(0, 5)}–${p.endTime.slice(0, 5)}`,
+        ...workingDays.map(d => (cells.get(`${d.id}-${p.id}`) ?? []).map(e => `${e.subjectName} · ${view === "teacher" ? e.className : e.teacherName}`).join("\n")),
+      ]),
+      styles: { fontSize: 8, cellPadding: 5, valign: "middle" },
+      headStyles: { fillColor: [21, 86, 216] },
+      columnStyles: { 0: { fontStyle: "bold" } },
+    });
+    const fileSafe = `${schoolName ?? "timetable"}-${view}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    doc.save(`${fileSafe}.pdf`);
+  }
+
+  if (loadError) return <ErrorState message={loadError} onRetry={load}/>;
+  if (loading) return <div className="timetable-layout single"><section className="panel timetable-main">
+    <div className="tt-toolbar"><div className="segmented"><button className="active">Class</button><button>Teacher</button><button>Master</button></div><span className="skeleton" style={{ width: 120, height: 40, borderRadius: 8 }}/></div>
+    <div className="score-row"><Skel w="120px"/></div>
+    <div className="tt-grid"><div className="tt-head">Period</div>{Array.from({ length: 5 }).map((_, i) => <div className="tt-head" key={i}><Skel w="60%"/></div>)}<GridSkeleton rows={6} cols={5}/></div>
+  </section></div>;
   if (!timetableInfo) return <div className="empty-inspector"><CalendarDays/><h3>No timetable generated yet</h3><p>Head to Generate timetable to create the first draft.</p></div>;
   if (workingDays.length === 0 || periodSlots.length === 0) return <div className="empty-inspector"><CalendarDays/><h3>School schedule not configured</h3><p>Set up teaching days and lesson periods first.</p></div>;
 
-  return <div className="timetable-layout">
+  return <div className="timetable-layout single">
     <section className="panel timetable-main">
       <div className="tt-toolbar">
         <div className="segmented">
@@ -993,13 +1133,21 @@ function Timetable() {
         {view === "teacher" && <select value={teacherId} onChange={e => setTeacherId(e.target.value)}>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select>}
         <button className="btn" disabled title="Not built yet"><ShieldCheck/> Validate</button>
         <button className="btn" onClick={regenerateUnlocked} disabled={regenerating}><RefreshCw/> {regenerating ? "Regenerating…" : "Regenerate unlocked"}</button>
+        {selected && <button className="btn" onClick={toggleLock} title={selected.isLocked ? "Locked — regeneration will keep this slot. Click to unlock." : "Unlocked — regeneration may move this lesson. Click to lock."}>
+          {selected.isLocked ? <LockKeyhole/> : <UnlockKeyhole/>} {selected.isLocked ? "Unlock lesson" : "Lock lesson"}
+        </button>}
+        <div className="tt-toolbar-actions">
+          <button className="btn" onClick={downloadPdf}><Download/> Download</button>
+          <button className="btn primary" onClick={() => { if (window.confirm("Publish this timetable? It will become visible to teachers and classes.")) toast.success("Timetable published"); }}>Publish timetable</button>
+        </div>
       </div>
       <div className="score-row">
         <span><b>{timetableInfo.qualityScore ?? "—"}</b>/100 Quality</span>
         <span><CalendarDays/> <b>{entries.length}</b> lessons scheduled</span>
         <small>Version {timetableInfo.version} {view === "class" ? "· Drag a lesson to reschedule" : "· Read-only view"}</small>
       </div>
-      <div className="tt-grid">
+      {entriesError && <div className="error-banner" style={{ margin: "0 14px" }}><AlertTriangle/><span>{entriesError}</span><button className="btn" onClick={loadEntries}>Retry</button></div>}
+      <div className="tt-grid" style={entriesLoading ? { opacity: 0.5 } : undefined}>
         <div className="tt-head">Period</div>
         {workingDays.map(d => <div className="tt-head" key={d.id}>{d.name}</div>)}
         {periodSlots.flatMap(p => [
@@ -1025,17 +1173,6 @@ function Timetable() {
         ])}
       </div>
     </section>
-    <aside className="panel inspector">
-      {selected ? <>
-        <div className="inspector-head"><div><span>Selected lesson</span><h3>{selected.subjectName}</h3><p>{selected.className}</p></div><button className="icon-btn" onClick={() => setSelected(null)}><X/></button></div>
-        <div className="detail-list"><span>Teacher <b>{selected.teacherName}</b></span></div>
-        <button className="lock-toggle" onClick={toggleLock}>
-          {selected.isLocked ? <LockKeyhole/> : <UnlockKeyhole/>}
-          <span><b>{selected.isLocked ? "Lesson locked" : "Lesson unlocked"}</b><small>{selected.isLocked ? "Regeneration will keep this slot." : "Regeneration may move this lesson."}</small></span>
-          <i className={selected.isLocked ? "switch on" : "switch"}/>
-        </button>
-      </> : <div className="empty-inspector"><CalendarDays/><h3>Select a lesson</h3><p>View its details.</p></div>}
-    </aside>
   </div>;
 }
-function SettingsPage(){return <section className="panel form-panel"><div className="section-heading"><div><h3>School profile</h3><p>This information is kept inside your school workspace.</p></div><button className="btn primary" onClick={()=>toast.success("School profile saved")}>Save changes</button></div><div className="logo-upload"><span><School2/></span><div><b>School logo</b><p>PNG or JPG, maximum 2 MB</p><button className="btn">Upload logo</button></div></div><div className="form-grid wide"><label>School display name<input defaultValue="Excellence Bilingual Academy"/></label><label>Registered name<input defaultValue="Excellence Bilingual Academy Ltd."/></label><label>School type<select><option>Primary & Secondary School</option></select></label><label>Curriculum<input defaultValue="Cameroon National Curriculum"/></label><label>Country<input defaultValue="Cameroon"/></label><label>Region<input defaultValue="Littoral"/></label><label>City<input defaultValue="Douala"/></label><label>Timezone<select><option>Africa/Douala</option></select></label><label className="span-2">Physical address<input defaultValue="Bonamoussadi, Douala"/></label><label>School email<input defaultValue="admin@excellence.edu.cm"/></label><label>School phone<input defaultValue="+237 677 000 000"/></label></div></section>}
+export function SettingsPage(){return <section className="panel form-panel"><div className="section-heading"><div><h3>School profile</h3><p>This information is kept inside your school workspace.</p></div><button className="btn primary" onClick={()=>toast.success("School profile saved")}>Save changes</button></div><div className="logo-upload"><span><School2/></span><div><b>School logo</b><p>PNG or JPG, maximum 2 MB</p><button className="btn">Upload logo</button></div></div><div className="form-grid wide"><label>School display name<input defaultValue="Excellence Bilingual Academy"/></label><label>Registered name<input defaultValue="Excellence Bilingual Academy Ltd."/></label><label>School type<select><option>Primary & Secondary School</option></select></label><label>Curriculum<input defaultValue="Cameroon National Curriculum"/></label><label>Country<input defaultValue="Cameroon"/></label><label>Region<input defaultValue="Littoral"/></label><label>City<input defaultValue="Douala"/></label><label>Timezone<select><option>Africa/Douala</option></select></label><label className="span-2">Physical address<input defaultValue="Bonamoussadi, Douala"/></label><label>School email<input defaultValue="admin@excellence.edu.cm"/></label><label>School phone<input defaultValue="+237 677 000 000"/></label></div></section>}

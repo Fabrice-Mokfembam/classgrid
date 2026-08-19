@@ -37,6 +37,8 @@ Everything else depends on knowing *which school* is asking for data, which depe
 - [x] Sign-in wired to `supabase.auth.signInWithPassword()`, sign-out wired to `supabase.auth.signOut()`.
 - [x] `app/page.tsx` checks for an existing session on load, so a returning/just-confirmed admin lands in the app instead of the marketing page.
 - [x] Added a minimal "current school" context (`lib/school-context.tsx`): after login, fetches the user's `school_memberships` row (+ joined `schools` and current `academic_years`, filtered on `is_current`), and passes school name / academic year down into `app-shell.tsx`'s sidebar instead of the hardcoded "Excellence Bilingual Academy" / "2026/2027". Phase 1 is now fully done.
+- [x] **Found post-launch and fixed: the whole authenticated app had no real URLs.** Every screen (dashboard, teachers, timetable, …) was one client component switching on local `useState`, so the address bar always stayed on `/` — refreshing on any page, or bookmarking/sharing a link to it, silently dumped you back to the dashboard. Replaced with real routes at `/<school-slug>/teachers`, `/<school-slug>/timetable`, etc. (`schools.slug`, already generated at onboarding, is the URL segment). The sidebar nav is now real `<Link>`s (`components/app-shell.tsx`'s `AppShellChrome`), and the active item / page heading are derived from `usePathname()` instead of tracked state. Sign-in, the post-confirmation callback (`app/auth/callback/route.ts`), and the landing page's "already signed in" check all now resolve the admin's school slug and land them on `/<slug>` directly instead of `/`.
+- [x] **Found immediately after, and fixed: that first routing pass made every sidebar click feel frozen.** The initial `app/[school]/layout.tsx` did two sequential Supabase round trips (an auth check, then a `school_memberships` query to re-verify the slug) directly in the layout with no Suspense boundary above it, so Next.js couldn't even swap the URL until both finished — a slow Supabase response meant a slow click, every time. Restructured: `layout.tsx` is now synchronous and wraps a new `app/[school]/school-gate.tsx` (the actual async auth check) in `<Suspense>`, so navigation commits immediately and the real content streams in. Also dropped the second round trip entirely — screens already scope every data query by the `schoolId` `lib/school-context.tsx` fetches client-side, never by the URL's slug, so re-verifying the slug server-side on every navigation was pure overhead for a property that isn't actually a security boundary. `AppShellChrome` now corrects a stale/wrong slug with `router.replace` once that client fetch resolves instead.
 
 ---
 
@@ -83,11 +85,14 @@ Still fake/untouched, deliberately out of this phase's scope: the "Validate" but
 
 Lower priority than the above — these matter once the core loop (setup → generate → publish) actually works end to end.
 
-- [ ] Loading and error states throughout — genuinely absent right now, not just minimal
-- [ ] PDF export (mentioned on the landing page and in the UI, not built)
-- [ ] Subscription/billing (README mentions it as a later stage)
+- [x] Loading and error states throughout — every data screen (Schedule, Levels, Subjects, Teachers, Availability, Assignments, Generate, Timetable) now shows a shape-matched skeleton (`Skel`/`RowsSkeleton`/`GridSkeleton` in `app-shell.tsx`) instead of plain "Loading…" text, and a dedicated `ErrorState` with a "Try again" button on fetch failure instead of silently rendering empty. `lib/school-context.tsx` surfaces its own fetch errors (`error`/`retry`) instead of swallowing them, and `AppShell` shows a full-page error if the school/membership lookup fails. A page-level `ErrorBoundary` (keyed by page, so navigating away resets it) now catches render-time crashes instead of blanking the whole app.
+- [x] PDF export — "Download" button on the Timetable toolbar (`downloadPdf()` in `app-shell.tsx`) renders the current view (Class/Teacher/Master) via `jspdf` + `jspdf-autotable` into a landscape PDF with school name/year header. Also added `window.confirm()` guards on the destructive/one-way actions nearby (sign out, generate, regenerate unlocked, publish) while touching this code.
 - [ ] Tests — there are currently none
 - [ ] Deployment: production env vars on the host (Vercel or similar), set the real `Site URL` and redirect URL in Supabase Auth settings to the deployed domain instead of `localhost:3000`
+
+**Post-MVP (after the above ships and the app is live):**
+
+- [ ] Subscription/billing (README mentions it as a later stage) — deliberately last: no point metering or charging for a product that isn't deployed yet
 
 ---
 

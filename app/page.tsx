@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, Clock3,
   FileCheck2, Grip, GripVertical, Layers, LockKeyhole, Menu, School2, ShieldCheck,
   Sparkles, UsersRound, X,
 } from "lucide-react";
-import { AuthScreen } from "@/components/auth-screen";
-import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/client";
-import { SchoolProvider } from "@/lib/school-context";
+import { fetchMySchoolSlug } from "@/lib/school-context";
 
 const CAPABILITIES = [
   { icon: Clock3, title: "Academic schedule", text: "Define teaching days, lesson periods and breaks once — every other screen builds on it." },
@@ -50,26 +49,29 @@ const FAQS = [
 ];
 
 export default function Home() {
-  const [screen, setScreen] = useState<"landing" | "auth" | "app">("landing");
+  const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const goToAuth = () => router.push("/auth");
 
   useEffect(() => {
+    let cancelled = false;
     const supabase = createClient();
     if (!supabase) { setCheckingSession(false); return; }
-    supabase.auth.getUser()
-      .then(({ data }) => {
-        if (data.user) setScreen("app");
-      })
-      .catch((error) => {
+    (async () => {
+      try {
+        const slug = await fetchMySchoolSlug(supabase);
+        if (cancelled) return;
+        if (slug) { router.replace(`/${slug}`); return; }
+      } catch (error) {
         console.error("Failed to check session:", error);
-      })
-      .finally(() => setCheckingSession(false));
-  }, []);
+      }
+      if (!cancelled) setCheckingSession(false);
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
 
   if (checkingSession) return <div className="app-loading"><CalendarDays /></div>;
-  if (screen === "auth") return <AuthScreen onComplete={() => setScreen("app")} onBack={() => setScreen("landing")} />;
-  if (screen === "app") return <SchoolProvider><AppShell onLogout={() => setScreen("landing")} /></SchoolProvider>;
 
   return (
     <main className="landing">
@@ -81,8 +83,8 @@ export default function Home() {
           <a href="#faq">FAQ</a>
         </div>
         <div className="nav-actions">
-          <button className="btn ghost" onClick={() => setScreen("auth")}>Sign in</button>
-          <button className="btn primary" onClick={() => setScreen("auth")}>Create school account <ArrowRight size={16} /></button>
+          <button className="btn ghost" onClick={() => goToAuth()}>Sign in</button>
+          <button className="btn primary" onClick={() => goToAuth()}>Create school account <ArrowRight size={16} /></button>
         </div>
         <button className="nav-toggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen(v => !v)}>
           {navOpen ? <X /> : <Menu />}
@@ -94,8 +96,8 @@ export default function Home() {
           <a href="#how" onClick={() => setNavOpen(false)}>How it works</a>
           <a href="#faq" onClick={() => setNavOpen(false)}>FAQ</a>
           <hr />
-          <button className="btn ghost" onClick={() => setScreen("auth")}>Sign in</button>
-          <button className="btn primary" onClick={() => setScreen("auth")}>Create school account <ArrowRight size={16} /></button>
+          <button className="btn ghost" onClick={() => goToAuth()}>Sign in</button>
+          <button className="btn primary" onClick={() => goToAuth()}>Create school account <ArrowRight size={16} /></button>
         </div>
       )}
 
@@ -105,7 +107,7 @@ export default function Home() {
           <h1>Build a conflict-free school timetable in minutes.</h1>
           <p>Configure your school, add teacher availability and teaching loads, then generate, adjust and publish every class timetable from one place.</p>
           <div className="hero-actions">
-            <button className="btn primary large" onClick={() => setScreen("auth")}>Start your school setup <ArrowRight size={18} /></button>
+            <button className="btn primary large" onClick={() => goToAuth()}>Start your school setup <ArrowRight size={18} /></button>
             <span>No credit card required</span>
           </div>
           <div className="trust-row">
@@ -214,7 +216,7 @@ export default function Home() {
       <section className="cta-banner">
         <h2>Stop rebuilding your timetable by hand.</h2>
         <p>Set up your school and see a generated timetable the same day.</p>
-        <button className="btn primary large" onClick={() => setScreen("auth")}>Start your school setup <ArrowRight size={18} /></button>
+        <button className="btn primary large" onClick={() => goToAuth()}>Start your school setup <ArrowRight size={18} /></button>
       </section>
 
       <footer className="site-footer">
