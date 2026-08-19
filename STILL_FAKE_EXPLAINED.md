@@ -1,9 +1,13 @@
-# Two spots that still look real but aren't (explained simply)
+# Two spots that used to look real but weren't (explained simply)
+
+**Update: both of these are now fixed** (commit `475ff66`). Keeping this
+doc as a record of what was wrong and why, since it explains the "fake vs
+real" idea in plain terms — just read the two sections below in the past
+tense now.
 
 While fixing the Dashboard page to show real numbers, I found two other
-spots in the app that are still "fake" — meaning they show something on
-screen, but nothing behind them is actually real. I didn't fix these (you
-didn't ask me to), I just want you to know they're there.
+spots in the app that were still "fake" — meaning they showed something on
+screen, but nothing behind them was actually real.
 
 Think of the whole app like a school play. Most of the set is now real —
 when you add a teacher, a real teacher gets added backstage. But these two
@@ -49,12 +53,16 @@ you leave the page.
 
 ---
 
-## Why I didn't just fix these too
+## What fixing them actually meant
 
-You asked me to make the *Dashboard* real, so that's what I focused on.
-These two spots are separate, pre-existing gaps I happened to notice along
-the way — fixing them wasn't part of what you asked for, so I left them
-alone and made a note instead of quietly doing extra work you didn't
-request.
-
-If you want, just say the word and I'll fix either (or both) of these next.
+- The sidebar box now shows the real percentage and real "X of 7 steps"
+  count — the same math the Dashboard's own banner uses, shared from one
+  place (`lib/setup-progress.ts`) so the two never disagree.
+- The name badge now shows whoever is actually logged in (pulled from
+  their real profile), with their real role underneath instead of "School
+  Administrator."
+- The Settings page now loads your school's real saved details when you
+  open it, and "Save changes" actually writes to the database — refresh
+  the page and your changes are still there.
+- The logo upload button is honest about not being finished yet: it tells
+  you so instead of silently doing nothing.
