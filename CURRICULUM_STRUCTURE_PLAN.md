@@ -251,20 +251,49 @@ doesn't create a row for a class whose level doesn't teach one of them.
       admin. If a level has no subjects configured yet, the subject field is
       replaced with a hint pointing at Levels → Manage subjects instead of
       showing an empty, unusable dropdown.
-- [ ] The teacher-form picker (bulk create assignments from the teacher
-      modal) is Phase 4, not touched here.
+- [x] The teacher-form picker (bulk create assignments from the teacher
+      modal) — see Phase 4 below.
 
-### Phase 4 — Teacher form gets class-aware bulk assignment
-- [ ] "Classes taught" multi-select on the teacher modal, creating the
-      matching `teaching_assignments` rows as described above.
+### Phase 4 — Teacher form gets class-aware bulk assignment ✅ done
+- [x] "Classes taught" multi-select added to the teacher modal
+      (`components/teachers.tsx`), alongside the existing subjects checklist.
+      On save, for every (selected class × selected subject) pair whose
+      class's level actually has that subject configured in `level_subjects`,
+      upserts a `teaching_assignments` row with the automatic periods-per-week
+      — `ignoreDuplicates` on the existing `(academic_year_id, teacher_id,
+      subject_id, class_section_id)` unique constraint means re-saving a
+      teacher with the same picks is a no-op rather than an error. This is
+      additive only: it doesn't display or remove the teacher's *existing*
+      assignments (managed on the Assignments screen), it only creates new
+      ones from what's checked at save time.
 
-### Phase 5 — Generator learns about parallel groups
-- [ ] `lib/generation/solver.ts`: class-occupancy check allows a slot that's
-      occupied by a same-parallel-group subject instead of rejecting it
-      outright.
-- [ ] Placement logic actively tries to co-place parallel-group subjects into
-      shared slots where possible, rather than only tolerating it if the
-      search happens to land there.
+### Phase 5 — Generator learns about parallel groups ✅ done
+- [x] `lib/generation/solver.ts`: `classBusy` changed from a flat
+      `Set<"classId|day|period">` to a `Map` from that same key to the set of
+      subject IDs occupying it. `canPlace` now allows a slot with existing
+      occupants only when the new subject shares a parallel group with every
+      one of them (`canShareSlot`, mirroring the DB trigger's pairwise
+      check) — instead of rejecting any already-busy slot outright.
+      `parallelSubjectPairs` (a precomputed `classId|subjectA|subjectB` set)
+      is built in `app/api/generate/route.ts` from `level_subjects` +
+      `level_subject_parallel_groups`, scoped per class section's level, and
+      passed into `SolverInput`.
+- [x] Placement logic actively tries to co-place: `getCandidates`'s
+      candidate ordering now ranks a slot that already holds a
+      parallel-compatible occupant above an empty slot (`isCoPlacement`),
+      right after the morning-preference tie-break and before load
+      balancing — so the search actively reuses a partner's slot to save a
+      scarce-availability teacher a fresh one, rather than only tolerating
+      the overlap if backtracking happens to land there.
+- [ ] **Not done, flagged as a real gap**: Phase 6 (Class/Teacher timetable
+      views stacking multiple lessons per cell) hasn't been built yet. The
+      solver can now legitimately place two lessons in one class's slot, but
+      the Class and Teacher views still only render one lesson per cell —
+      only the Master view stacks today. Until Phase 6 ships, a genuine
+      parallel placement from a fresh Generate would be invisible/silently
+      dropped from the Class/Teacher grid's rendering (the underlying
+      `timetable_entries` rows are both there; only the display doesn't show
+      both). Do Phase 6 before relying on this in practice.
 
 ### Phase 6 — Timetable display shows parallel lessons
 - [ ] Class and Teacher views render more than one lesson per cell (reusing

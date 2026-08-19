@@ -8,12 +8,21 @@ type Candidate = { day: SolverDay; periods: SolverPeriod[] };
 
 type SearchState = {
   teacherBusy: Set<string>; // `${teacherId}|${dayId}|${periodId}`
-  classBusy: Set<string>; // `${classSectionId}|${dayId}|${periodId}`
+  classBusy: Map<string, Set<string>>; // `${classSectionId}|${dayId}|${periodId}` -> subjectIds occupying that slot
   assignmentDayCount: Map<string, number>; // `${assignmentId}|${dayId}`
   teacherDayCount: Map<string, number>; // `${teacherId}|${dayId}`
   teacherDaySortOrders: Map<string, number[]>; // `${teacherId}|${dayId}`
   classDayCount: Map<string, number>; // `${classSectionId}|${dayId}`
 };
+
+// Two different subjects may share one class's slot only when the school configured them as
+// parallel-compatible at that class's level (see CURRICULUM_STRUCTURE_PLAN.md) — mirrors the
+// `check_timetable_entry_class_slot` DB trigger's pairwise check, one occupant at a time.
+function canShareSlot(input: SolverInput, classSectionId: string, subjectA: string, subjectB: string): boolean {
+  if (subjectA === subjectB) return false;
+  const [x, y] = [subjectA, subjectB].sort();
+  return input.parallelSubjectPairs?.has(`${classSectionId}|${x}|${y}`) ?? false;
+}
 
 class BudgetExceeded extends Error {}
 
@@ -59,7 +68,12 @@ function canPlace(assignment: SolverAssignment, day: SolverDay, periods: SolverP
     if (state.teacherBusy.has(teacherKey)) return false;
     if (input.unavailable.has(teacherKey)) return false;
     const classKey = `${assignment.classSectionId}|${day.id}|${period.id}`;
-    if (state.classBusy.has(classKey)) return false;
+    const occupants = state.classBusy.get(classKey);
+    if (occupants) {
+      for (const occupantSubjectId of occupants) {
+        if (!canShareSlot(input, assignment.classSectionId, assignment.subjectId, occupantSubjectId)) return false;
+      }
+    }
   }
 
   const assignDayKey = `${assignment.id}|${day.id}`;
@@ -80,7 +94,10 @@ function canPlace(assignment: SolverAssignment, day: SolverDay, periods: SolverP
 function place(assignment: SolverAssignment, day: SolverDay, periods: SolverPeriod[], state: SearchState) {
   for (const period of periods) {
     state.teacherBusy.add(`${assignment.teacherId}|${day.id}|${period.id}`);
-    state.classBusy.add(`${assignment.classSectionId}|${day.id}|${period.id}`);
+    const classKey = `${assignment.classSectionId}|${day.id}|${period.id}`;
+    const occupants = state.classBusy.get(classKey) ?? new Set<string>();
+    occupants.add(assignment.subjectId);
+    state.classBusy.set(classKey, occupants);
   }
   const assignDayKey = `${assignment.id}|${day.id}`;
   state.assignmentDayCount.set(assignDayKey, (state.assignmentDayCount.get(assignDayKey) ?? 0) + periods.length);
@@ -94,7 +111,12 @@ function place(assignment: SolverAssignment, day: SolverDay, periods: SolverPeri
 function unplace(assignment: SolverAssignment, day: SolverDay, periods: SolverPeriod[], state: SearchState) {
   for (const period of periods) {
     state.teacherBusy.delete(`${assignment.teacherId}|${day.id}|${period.id}`);
-    state.classBusy.delete(`${assignment.classSectionId}|${day.id}|${period.id}`);
+    const classKey = `${assignment.classSectionId}|${day.id}|${period.id}`;
+    const occupants = state.classBusy.get(classKey);
+    if (occupants) {
+      occupants.delete(assignment.subjectId);
+      if (occupants.size === 0) state.classBusy.delete(classKey);
+    }
   }
   const assignDayKey = `${assignment.id}|${day.id}`;
   state.assignmentDayCount.set(assignDayKey, (state.assignmentDayCount.get(assignDayKey) ?? 0) - periods.length);
@@ -133,12 +155,23 @@ function getCandidates(unit: Unit, days: SolverDay[], doublePairs: [SolverPeriod
       const ym = y.periods[0].dayBlock === "morning" ? 0 : 1;
       if (xm !== ym) return xm - ym;
     }
+    // Actively prefer reusing a slot a parallel-compatible subject already occupies over
+    // consuming a fresh empty one — this is what actually saves slots for a teacher with
+    // scarce availability (the COM/CSC case CURRICULUM_STRUCTURE_PLAN.md was written for),
+    // not just tolerating the overlap if the search happens to land there anyway.
+    const coX = isCoPlacement(unit, x, state) ? 0 : 1;
+    const coY = isCoPlacement(unit, y, state) ? 0 : 1;
+    if (coX !== coY) return coX - coY;
     const loadX = (state.classDayCount.get(`${a.classSectionId}|${x.day.id}`) ?? 0) + (state.teacherDayCount.get(`${a.teacherId}|${x.day.id}`) ?? 0);
     const loadY = (state.classDayCount.get(`${a.classSectionId}|${y.day.id}`) ?? 0) + (state.teacherDayCount.get(`${a.teacherId}|${y.day.id}`) ?? 0);
     if (loadX !== loadY) return loadX - loadY;
     if (x.day.sortOrder !== y.day.sortOrder) return x.day.sortOrder - y.day.sortOrder;
     return x.periods[0].sortOrder - y.periods[0].sortOrder;
   });
+}
+
+function isCoPlacement(unit: Unit, cand: Candidate, state: SearchState): boolean {
+  return cand.periods.some(period => (state.classBusy.get(`${unit.assignment.classSectionId}|${cand.day.id}|${period.id}`)?.size ?? 0) > 0);
 }
 
 type Budget = { nodes: number; maxNodes: number; start: number; maxMs: number };
@@ -164,7 +197,7 @@ function backtrack(
 }
 
 function createEmptyState(): SearchState {
-  return { teacherBusy: new Set(), classBusy: new Set(), assignmentDayCount: new Map(), teacherDayCount: new Map(), teacherDaySortOrders: new Map(), classDayCount: new Map() };
+  return { teacherBusy: new Set(), classBusy: new Map(), assignmentDayCount: new Map(), teacherDayCount: new Map(), teacherDaySortOrders: new Map(), classDayCount: new Map() };
 }
 
 export function solve(input: SolverInput): SolverResult {

@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     if (!existing) return NextResponse.json({ error: "Timetable not found" }, { status: 404 });
   }
 
-  const [assignmentsRes, availabilityRes, daysRes, periodsRes, teachersRes] = await Promise.all([
+  const [assignmentsRes, availabilityRes, daysRes, periodsRes, teachersRes, classSectionsRes, levelSubjectsRes] = await Promise.all([
     supabase.from("teaching_assignments").select("id, teacher_id, subject_id, class_section_id, periods_per_week, pattern, double_period_count, max_per_day, prefer_morning")
       .eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("status", "active"),
     supabase.from("teacher_availability").select("teacher_id, working_day_id, period_slot_id, is_available")
@@ -38,15 +38,63 @@ export async function POST(request: Request) {
     supabase.from("working_days").select("id, sort_order").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true),
     supabase.from("period_slots").select("id, sort_order, day_block").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson"),
     supabase.from("teachers").select("id, max_periods_per_day, max_consecutive_periods").eq("school_id", schoolId).eq("status", "active"),
+    supabase.from("class_sections").select("id, level_id").eq("school_id", schoolId).eq("academic_year_id", academicYearId),
+    supabase.from("level_subjects").select("id, level_id, subject_id").eq("school_id", schoolId),
   ]);
 
-  for (const res of [assignmentsRes, availabilityRes, daysRes, periodsRes, teachersRes]) {
+  for (const res of [assignmentsRes, availabilityRes, daysRes, periodsRes, teachersRes, classSectionsRes, levelSubjectsRes]) {
     if (res.error) return NextResponse.json({ error: res.error.message }, { status: 500 });
   }
 
   const assignments = assignmentsRes.data ?? [];
   const days = daysRes.data ?? [];
   const periods = periodsRes.data ?? [];
+  const levelSubjects = levelSubjectsRes.data ?? [];
+
+  // Parallel-compatible subject pairs (CURRICULUM_STRUCTURE_PLAN.md): two subjects at the same
+  // level may share one class's slot if their level_subjects rows share any parallel group.
+  const levelSubjectIds = levelSubjects.map(ls => ls.id);
+  const membershipsRes = levelSubjectIds.length
+    ? await supabase.from("level_subject_parallel_groups").select("level_subject_id, parallel_group_id").in("level_subject_id", levelSubjectIds)
+    : { data: [] as { level_subject_id: string; parallel_group_id: string }[], error: null };
+  if (membershipsRes.error) return NextResponse.json({ error: membershipsRes.error.message }, { status: 500 });
+
+  const groupsByLevelSubjectId = new Map<string, Set<string>>();
+  (membershipsRes.data ?? []).forEach(m => {
+    const set = groupsByLevelSubjectId.get(m.level_subject_id) ?? new Set<string>();
+    set.add(m.parallel_group_id);
+    groupsByLevelSubjectId.set(m.level_subject_id, set);
+  });
+  const groupsByLevelAndSubject = new Map<string, Set<string>>(); // `${levelId}|${subjectId}` -> group ids
+  levelSubjects.forEach(ls => {
+    const groups = groupsByLevelSubjectId.get(ls.id);
+    if (groups?.size) groupsByLevelAndSubject.set(`${ls.level_id}|${ls.subject_id}`, groups);
+  });
+  const classSectionLevelId = new Map((classSectionsRes.data ?? []).map(cs => [cs.id, cs.level_id] as const));
+
+  const parallelSubjectPairs = new Set<string>();
+  const assignmentsByClass = new Map<string, typeof assignments>();
+  assignments.forEach(a => {
+    const list = assignmentsByClass.get(a.class_section_id) ?? [];
+    list.push(a);
+    assignmentsByClass.set(a.class_section_id, list);
+  });
+  assignmentsByClass.forEach((list, classSectionId) => {
+    const levelId = classSectionLevelId.get(classSectionId);
+    if (!levelId) return;
+    const subjects = [...new Set(list.map(a => a.subject_id))];
+    for (let i = 0; i < subjects.length; i++) {
+      for (let j = i + 1; j < subjects.length; j++) {
+        const groupsA = groupsByLevelAndSubject.get(`${levelId}|${subjects[i]}`);
+        const groupsB = groupsByLevelAndSubject.get(`${levelId}|${subjects[j]}`);
+        const shareGroup = groupsA && groupsB && [...groupsA].some(g => groupsB.has(g));
+        if (shareGroup) {
+          const [x, y] = [subjects[i], subjects[j]].sort();
+          parallelSubjectPairs.add(`${classSectionId}|${x}|${y}`);
+        }
+      }
+    }
+  });
 
   if (days.length === 0) return NextResponse.json({ error: "No active teaching days configured. Set up your school schedule first." }, { status: 400 });
   if (periods.length === 0) return NextResponse.json({ error: "No lesson periods configured. Set up your school schedule first." }, { status: 400 });
@@ -97,7 +145,7 @@ export async function POST(request: Request) {
     days: days.map(d => ({ id: d.id, sortOrder: d.sort_order })),
     periods: periods.map(p => ({ id: p.id, sortOrder: p.sort_order, dayBlock: p.day_block as "morning" | "afternoon" | null })),
     assignments: solverAssignments,
-    teacherMaxPeriodsPerDay, teacherMaxConsecutive, unavailable, preplaced,
+    teacherMaxPeriodsPerDay, teacherMaxConsecutive, unavailable, preplaced, parallelSubjectPairs,
   };
 
   const { data: run, error: runError } = await supabase.from("generation_runs")
