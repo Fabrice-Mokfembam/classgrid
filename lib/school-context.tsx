@@ -11,13 +11,14 @@ export type SchoolContextValue = {
   schoolName: string | null;
   academicYearName: string | null;
   role: string | null;
+  fullName: string | null;
   loading: boolean;
   error: string | null;
   retry: () => void;
 };
 
 const initial: Omit<SchoolContextValue, "retry"> = {
-  schoolId: null, schoolSlug: null, academicYearId: null, schoolName: null, academicYearName: null, role: null, loading: true, error: null,
+  schoolId: null, schoolSlug: null, academicYearId: null, schoolName: null, academicYearName: null, role: null, fullName: null, loading: true, error: null,
 };
 
 const SchoolContext = createContext<SchoolContextValue>({ ...initial, retry: () => {} });
@@ -65,14 +66,13 @@ export function SchoolProvider({ children }: { children: ReactNode }) {
         if (membershipError) { if (!cancelled) setValue(v => ({ ...v, loading: false, error: membershipError.message })); return; }
         if (!membership) { if (!cancelled) setValue(v => ({ ...v, loading: false })); return; }
 
-        const { data: year, error: yearError } = await supabase
-          .from("academic_years")
-          .select("id, name")
-          .eq("school_id", membership.school_id)
-          .eq("is_current", true)
-          .maybeSingle();
+        const [{ data: year, error: yearError }, { data: profile, error: profileError }] = await Promise.all([
+          supabase.from("academic_years").select("id, name").eq("school_id", membership.school_id).eq("is_current", true).maybeSingle(),
+          supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+        ]);
 
         if (yearError) { if (!cancelled) setValue(v => ({ ...v, loading: false, error: yearError.message })); return; }
+        if (profileError) { if (!cancelled) setValue(v => ({ ...v, loading: false, error: profileError.message })); return; }
 
         if (!cancelled) {
           const schoolRow = Array.isArray(membership.schools) ? membership.schools[0] : membership.schools;
@@ -83,6 +83,7 @@ export function SchoolProvider({ children }: { children: ReactNode }) {
             schoolName: (schoolRow as { name: string } | null)?.name ?? null,
             academicYearName: year?.name ?? null,
             role: membership.role,
+            fullName: profile?.full_name ?? null,
             loading: false,
             error: null,
           });

@@ -9,7 +9,16 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
+import { loadSetupProgress, type SetupProgress } from "@/lib/setup-progress";
 import { ErrorBoundary, ErrorState, Skel } from "@/components/shared";
+
+function roleLabel(role: string | null): string {
+  if (!role) return "";
+  return role.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+}
+function initialsOf(name: string): string {
+  return name.split(" ").filter(Boolean).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+}
 
 // ─── Re-exports so existing page files keep working without changes ────────────
 export { Dashboard } from "@/components/dashboard";
@@ -71,7 +80,17 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
   const router = useRouter();
   const pathname = usePathname();
   const page = pageFromPathname(pathname, schoolSlug);
-  const { schoolId, schoolSlug: realSlug, schoolName, academicYearName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
+  const { schoolId, schoolSlug: realSlug, schoolName, academicYearId, academicYearName, role, fullName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
+  const [progress, setProgress] = useState<SetupProgress | null>(null);
+
+  useEffect(() => {
+    if (!schoolId || !academicYearId) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    let cancelled = false;
+    loadSetupProgress(supabase, schoolId, academicYearId).then(p => { if (!cancelled) setProgress(p); });
+    return () => { cancelled = true; };
+  }, [schoolId, academicYearId]);
 
   // The URL slug is taken on faith by the server guard; once the real membership
   // loads client-side, correct a stale/wrong one here.
@@ -119,9 +138,9 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
         </nav>
         <div className="sidebar-bottom">
           <div className="setup-mini">
-            <b>Setup progress <span>82%</span></b>
-            <div className="progress"><i style={{ width: "82%" }} /></div>
-            <small>6 of 7 steps completed</small>
+            <b>Setup progress <span>{progress ? `${progress.percent}%` : <Skel w="30px" sm />}</span></b>
+            <div className="progress"><i style={{ width: `${progress?.percent ?? 0}%` }} /></div>
+            <small>{progress ? `${progress.completedCount} of ${progress.totalSteps} steps completed` : <Skel w="100px" sm />}</small>
           </div>
           <button className="nav-item" onClick={async () => {
             if (!window.confirm("Sign out of ClassGrid?")) return;
@@ -142,8 +161,8 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           <div className="crumb">School workspace <span>/</span> {titles[page][0]}</div>
           <div className="top-actions">
             <button className="icon-btn"><Search /></button>
-            <div className="avatar">GA</div>
-            <div className="admin-name"><b>Grace Admin</b><small>School Administrator</small></div>
+            <div className="avatar">{schoolLoading ? "" : fullName ? initialsOf(fullName) : "?"}</div>
+            <div className="admin-name"><b>{schoolLoading ? <Skel w="70px" /> : fullName ?? "Unnamed admin"}</b><small>{schoolLoading ? <Skel w="90px" /> : roleLabel(role)}</small></div>
           </div>
         </header>
         <main className="workspace">
