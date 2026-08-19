@@ -226,10 +226,9 @@ doesn't create a row for a class whose level doesn't teach one of them.
       first. Rewrote `check_timetable_entry_class_slot()` to allow a shared
       slot when the two entries' `level_subjects` rows have *any* group in
       common (via a self-join on the join table) instead of comparing one
-      column for equality. **Not yet pushed to the live database** — the
-      Supabase CLI in this environment got a 403 on `migration list`
-      (insufficient privileges), so this still needs `supabase db push` run
-      with proper credentials before the app will actually see the new table.
+      column for equality. Pushed to `timetableproject` on 2026-08-19 —
+      `supabase migration list` confirms local and remote now match on all
+      five migrations.
 
 ### Phase 2 — Manage subjects per level (new UI) ✅ done
 - [x] Levels screen gains a "Manage subjects" modal per level
