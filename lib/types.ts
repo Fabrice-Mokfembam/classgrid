@@ -15,3 +15,5 @@ export type TeachingAssignment = { id:string; teacherId:string; teacherName:stri
 export type SchedulePeriod = { id:string; name:string; kind:"lesson"|"break"; startTime:string; endTime:string; periodNumber:number|null; sortOrder:number };
 export type TimetableEntry = { id:string; dayId:string; periodSlotId:string; isLocked:boolean; subjectName:string; subjectColor:string; teacherName:string; className:string };
 export type GenerationSummary = { timetableId:string; generationRunId:string; scheduled:number; totalRequired:number; hardConflicts:number; softWarnings:number; qualityScore:number; timedOut:boolean };
+export type LevelSubjectRow = { id:string; subjectId:string; periodsPerWeek:number; streamLabel:string|null; parallelGroupIds:string[] };
+export type ParallelGroup = { id:string; name:string|null };

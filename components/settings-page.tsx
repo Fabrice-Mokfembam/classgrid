@@ -1,0 +1,7 @@
+"use client";
+import { School2 } from "lucide-react";
+import { toast } from "sonner";
+
+export function SettingsPage() {
+  return <section className="panel form-panel"><div className="section-heading"><div><h3>School profile</h3><p>This information is kept inside your school workspace.</p></div><button className="btn primary" onClick={() => toast.success("School profile saved")}>Save changes</button></div><div className="logo-upload"><span><School2 /></span><div><b>School logo</b><p>PNG or JPG, maximum 2 MB</p><button className="btn">Upload logo</button></div></div><div className="form-grid wide"><label>School display name<input defaultValue="Excellence Bilingual Academy" /></label><label>Registered name<input defaultValue="Excellence Bilingual Academy Ltd." /></label><label>School type<select><option>Primary &amp; Secondary School</option></select></label><label>Curriculum<input defaultValue="Cameroon National Curriculum" /></label><label>Country<input defaultValue="Cameroon" /></label><label>Region<input defaultValue="Littoral" /></label><label>City<input defaultValue="Douala" /></label><label>Timezone<select><option>Africa/Douala</option></select></label><label className="span-2">Physical address<input defaultValue="Bonamoussadi, Douala" /></label><label>School email<input defaultValue="admin@excellence.edu.cm" /></label><label>School phone<input defaultValue="+237 677 000 000" /></label></div></section>;
+}
