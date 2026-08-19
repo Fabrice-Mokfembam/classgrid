@@ -101,8 +101,10 @@ export function Timetable() {
     if (!dragged) return;
     const dragSnapshot = dragged;
     setDragged(null);
-    const target = (cells.get(`${dayId}-${periodId}`) ?? [])[0];
-    if (target?.id === dragSnapshot.id) return;
+    const destEntries = cells.get(`${dayId}-${periodId}`) ?? [];
+    if (destEntries.some(x => x.id === dragSnapshot.id)) return;
+    if (destEntries.length > 1) { toast.error("This slot already has two parallel lessons — move one of them out first"); return; }
+    const target = destEntries[0];
     if (target?.isLocked) { toast.error("This lesson is locked and cannot be replaced"); return; }
     const supabase = createClient();
     if (!supabase) return;
@@ -202,13 +204,14 @@ export function Timetable() {
                 </button>)}
               </div>;
             }
-            const e = cellEntries[0];
-            return <div className={dragged && dragged.id === e?.id ? "tt-cell dragging" : "tt-cell"} key={`${d.id}-${p.id}`}
+            const isDragging = !!dragged && cellEntries.some(x => x.id === dragged.id);
+            return <div className={isDragging ? "tt-cell dragging" : "tt-cell"} key={`${d.id}-${p.id}`}
+              style={{ display: "flex", flexDirection: "column", gap: "4px" }}
               onDragOver={view === "class" ? ev => ev.preventDefault() : undefined}
               onDrop={view === "class" ? () => handleDrop(d.id, p.id) : undefined}>
-              {e && <button draggable={view === "class" && !e.isLocked} onDragStart={() => setDragged(e)} onClick={() => setSelected(e)} className={`lesson ${selected?.id === e.id ? "selected" : ""}`} style={{ borderLeft: `4px solid ${e.subjectColor}` }}>
+              {cellEntries.map(e => <button key={e.id} draggable={view === "class" && !e.isLocked} onDragStart={() => setDragged(e)} onClick={() => setSelected(e)} className={`lesson ${selected?.id === e.id ? "selected" : ""}`} style={{ borderLeft: `4px solid ${e.subjectColor}` }}>
                 <span><b>{e.subjectName}</b><small>{view === "teacher" ? e.className : e.teacherName}</small></span>{e.isLocked && <LockKeyhole />}
-              </button>}
+              </button>)}
             </div>;
           }),
         ])}

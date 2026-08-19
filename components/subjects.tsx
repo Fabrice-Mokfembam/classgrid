@@ -74,7 +74,7 @@ export function Subjects() {
 
   return <TableShell title="All subjects" count={subjectsList.length} button="Add subject" onAdd={() => setSubjectModal({ mode: "add" })}>
     {loading ? <div className="data-table"><div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div><RowsSkeleton className="data-row subjects" cols={4} rows={5} /></div> : subjectsList.length === 0 ? (
-      <div className="empty-inspector"><BookOpen /><h3>No subjects yet</h3><p>Add your first subject to get started.</p></div>
+      <div className="empty-inspector"><BookOpen /><h3>No subjects yet</h3><p>Add your first subject to get started. Once you have some, head to Levels → Manage subjects to decide which levels teach them and their weekly periods.</p></div>
     ) : <div className="data-table">
       <div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div>
       {subjectsList.map(s => <div className="data-row subjects" key={s.id}>

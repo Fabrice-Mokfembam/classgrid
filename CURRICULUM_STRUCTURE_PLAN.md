@@ -285,15 +285,44 @@ doesn't create a row for a class whose level doesn't teach one of them.
       balancing — so the search actively reuses a partner's slot to save a
       scarce-availability teacher a fresh one, rather than only tolerating
       the overlap if backtracking happens to land there.
-- [ ] **Not done, flagged as a real gap**: Phase 6 (Class/Teacher timetable
-      views stacking multiple lessons per cell) hasn't been built yet. The
-      solver can now legitimately place two lessons in one class's slot, but
-      the Class and Teacher views still only render one lesson per cell —
-      only the Master view stacks today. Until Phase 6 ships, a genuine
-      parallel placement from a fresh Generate would be invisible/silently
-      dropped from the Class/Teacher grid's rendering (the underlying
-      `timetable_entries` rows are both there; only the display doesn't show
-      both). Do Phase 6 before relying on this in practice.
+- [x] Was flagged as a gap when Phase 5 shipped, now closed by Phase 6 below.
+
+### Phase 6 — Timetable display shows parallel lessons ✅ done
+- [x] `components/timetable.tsx`: Class and Teacher cells now map over every
+      entry in `cellEntries` instead of taking only `cellEntries[0]`, reusing
+      the flex-column stacking style the Master view already used. Each
+      lesson button keeps its own `key`, `onClick`/`setSelected`, and
+      `draggable`, so selecting or locking one lesson in a shared cell only
+      ever touches that entry — never its parallel partner.
+- [x] Drag-and-drop: dropping onto a cell holding exactly one lesson still
+      does the existing atomic swap; dropping onto an empty cell still does
+      a plain move. Dropping onto a cell that already holds **two** lessons
+      (a full parallel pair) is now explicitly blocked with a toast, rather
+      than silently swapping against an arbitrary one of the two — 3-way
+      swap semantics were judged out of scope here. PDF export already
+      joined multiple entries per cell with a line break, so it needed no
+      change and was already showing parallel pairs correctly even before
+      this phase.
+
+### Phase 7 — Setup guidance ✅ done
+- [x] Dashboard (`components/dashboard.tsx`) gains a "Recommended setup
+      order" panel: six numbered, clickable steps (Levels → Subjects →
+      Subjects per level → Class sections → Teachers → Teaching assignments)
+      that jump straight to the relevant screen, plus a one-line note that
+      assignments specifically depend on subjects being configured per
+      level first. Deliberately doesn't touch the dashboard's hardcoded
+      stats/progress ring next to it — those are still fake and a separate,
+      already-flagged NEXT_STEPS.md gap, not something to paper over with
+      real-looking copy.
+- [x] Subjects screen's empty state now points forward to Levels → Manage
+      subjects instead of ending at "add your first subject."
+
+---
+
+**All 7 phases of this plan are now done.** Remaining polish, not part of
+this plan: NEXT_STEPS.md's own open items (tests, deployment) and the
+Dashboard's stats/progress ring still being hardcoded rather than wired to
+real data.
 
 ### Phase 6 — Timetable display shows parallel lessons
 - [ ] Class and Teacher views render more than one lesson per cell (reusing
