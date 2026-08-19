@@ -324,17 +324,6 @@ this plan: NEXT_STEPS.md's own open items (tests, deployment) and the
 Dashboard's stats/progress ring still being hardcoded rather than wired to
 real data.
 
-### Phase 6 — Timetable display shows parallel lessons
-- [ ] Class and Teacher views render more than one lesson per cell (reusing
-      the Master view's existing stacking pattern).
-- [ ] Selecting/locking a specific lesson in a shared cell still targets that
-      one lesson, not both.
-
-### Phase 7 — Setup guidance
-- [ ] Dashboard / empty-state copy states the dependency order explicitly:
-      levels → subjects → subjects-per-level (incl. weekly counts and any
-      parallel groups) → class sections → teachers → assignments.
-
 ---
 
 ## Open questions — resolved
