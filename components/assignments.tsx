@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileCheck2, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -53,6 +53,7 @@ export function Assignments() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [assignmentModal, setAssignmentModal] = useState<{ mode: "add" } | { mode: "edit"; assignment: TeachingAssignment } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -106,18 +107,28 @@ export function Assignments() {
     load();
   }
 
+  const filteredAssignments = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return assignmentsList;
+    return assignmentsList.filter(a => [
+      a.teacherName, a.subjectName, a.className, PATTERN_LABELS[a.pattern] ?? a.pattern, a.status, String(a.periodsPerWeek),
+    ].some(value => value.toLowerCase().includes(q)));
+  }, [assignmentsList, search]);
+
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
-  return <TableShell title="Teaching assignments" count={assignmentsList.length} button="Add assignment" onAdd={() => {
+  return <TableShell title="Teaching assignments" count={filteredAssignments.length} button="Add assignment" onAdd={() => {
     if (teacherOptions.length === 0 || subjectOptions.length === 0 || classOptions.length === 0) { toast.error("Add a teacher, a subject and a class section first"); return; }
     setAssignmentModal({ mode: "add" });
-  }}>
+  }} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search assignments…">
     <div className="info-banner"><ShieldCheck /><div><b>The assignment is the generator's core input</b><span>It connects one teacher, subject and actual class with its weekly period requirement.</span></div></div>
     {loading ? <div className="data-table"><div className="data-row head assignments"><span>Teacher</span><span>Subject</span><span>Class</span><span>Periods / week</span><span>Pattern</span><span></span></div><RowsSkeleton className="data-row assignments" cols={5} rows={5} /></div> : assignmentsList.length === 0 ? (
       <div className="empty-inspector"><FileCheck2 /><h3>No teaching assignments yet</h3><p>Add your first assignment to get started.</p></div>
+    ) : filteredAssignments.length === 0 ? (
+      <div className="empty-inspector"><FileCheck2 /><h3>No assignments found</h3><p>Try a different teacher, subject, class, pattern, or period count.</p></div>
     ) : <div className="data-table">
       <div className="data-row head assignments"><span>Teacher</span><span>Subject</span><span>Class</span><span>Periods / week</span><span>Pattern</span><span></span></div>
-      {assignmentsList.map(a => <div className="data-row assignments" key={a.id}>
+      {filteredAssignments.map(a => <div className="data-row assignments" key={a.id}>
         <span><span className="avatar">{a.teacherName.split(" ").map(x => x[0]).join("")}</span><b>{a.teacherName}</b></span>
         <span>{a.subjectName}</span>
         <span><i className="status-pill">{a.className}</i></span>

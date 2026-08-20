@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, UsersRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -50,6 +50,7 @@ export function Teachers() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teacherModal, setTeacherModal] = useState<{ mode: "add" } | { mode: "edit"; teacher: SchoolTeacher } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -148,9 +149,18 @@ export function Teachers() {
     load();
   }
 
+  const filteredTeachers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return teachersList;
+    return teachersList.filter(t => [
+      t.fullName, t.teacherCode ?? "", t.email ?? "", t.phone ?? "", t.status, ...t.subjectNames,
+      String(t.requiredPeriods), String(t.availableSlots),
+    ].some(value => value.toLowerCase().includes(q)));
+  }, [teachersList, search]);
+
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
-  return <TableShell title="Teaching staff" count={teachersList.length} button="Add teacher" onAdd={() => setTeacherModal({ mode: "add" })}>
+  return <TableShell title="Teaching staff" count={filteredTeachers.length} button="Add teacher" onAdd={() => setTeacherModal({ mode: "add" })} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search teachers…">
     {loading ? <div className="teacher-cards">{Array.from({ length: 3 }).map((_, i) => <article key={i}>
       <div className="teacher-top"><span className="avatar large skeleton" style={{ boxShadow: "none" }} /></div>
       <h3><Skel w="60%" /></h3>
@@ -159,8 +169,10 @@ export function Teachers() {
       <footer><Skel w="50%" /></footer>
     </article>)}</div> : teachersList.length === 0 ? (
       <div className="empty-inspector"><UsersRound /><h3>No teachers yet</h3><p>Add your first teacher to get started.</p></div>
+    ) : filteredTeachers.length === 0 ? (
+      <div className="empty-inspector"><UsersRound /><h3>No teachers found</h3><p>Try a different name, code, subject, phone, email, or workload.</p></div>
     ) : <div className="teacher-cards">
-      {teachersList.map(t => <article key={t.id}>
+      {filteredTeachers.map(t => <article key={t.id}>
         <div className="teacher-top">
           <span className="avatar large">{t.fullName.split(" ").map(x => x[0]).join("")}</span>
           <div className="row-menu">

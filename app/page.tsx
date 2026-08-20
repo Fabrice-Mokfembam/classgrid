@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMySchoolSlug } from "@/lib/school-context";
+import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
 
 const CAPABILITIES = [
   { icon: Clock3, title: "Academic schedule", text: "Define teaching days, lesson periods and breaks once — every other screen builds on it." },
@@ -71,13 +72,14 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [router]);
 
-  if (checkingSession) return <div className="app-loading"><CalendarDays /></div>;
+  if (checkingSession) return <div className="app-loading"><img className="app-loading-logo" src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></div>;
 
   return (
     <main className="landing">
       <nav className="landing-nav">
-        <div className="brand"><span className="brand-mark"><CalendarDays size={20} /></span>ClassGrid</div>
+        <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
         <div className="nav-links">
+          <a href="/guide">Guide</a>
           <a href="#capabilities">Capabilities</a>
           <a href="#how">How it works</a>
           <a href="#faq">FAQ</a>
@@ -92,6 +94,7 @@ export default function Home() {
       </nav>
       {navOpen && (
         <div className="nav-mobile">
+          <a href="/guide" onClick={() => setNavOpen(false)}>Guide</a>
           <a href="#capabilities" onClick={() => setNavOpen(false)}>Capabilities</a>
           <a href="#how" onClick={() => setNavOpen(false)}>How it works</a>
           <a href="#faq" onClick={() => setNavOpen(false)}>FAQ</a>
@@ -116,7 +119,7 @@ export default function Home() {
           </div>
         </div>
         <div className="hero-product">
-          <div className="product-top"><span className="mini-logo"><School2 /> Excellence Bilingual Academy</span><span className="status-pill success">Ready to publish</span></div>
+          <div className="product-top"><span className="mini-logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /> Excellence Bilingual Academy</span><span className="status-pill success">Ready to publish</span></div>
           <div className="mini-stats"><div><b>24</b><span>Teachers</span></div><div><b>12</b><span>Classes</span></div><div><b>186</b><span>Lessons</span></div></div>
           <div className="mini-grid">
             <div className="mini-head"></div>
@@ -222,17 +225,17 @@ export default function Home() {
       <footer className="site-footer">
         <div className="footer-top">
           <div className="footer-brand">
-            <div className="brand"><span className="brand-mark"><CalendarDays size={20} /></span>ClassGrid</div>
+            <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
             <p>Conflict-free school timetabling for multi-school administrators.</p>
           </div>
           <div className="footer-cols">
-            <div><b>Product</b><a href="#capabilities">Capabilities</a><a href="#how">How it works</a><a href="#faq">FAQ</a></div>
+            <div><b>Product</b><a href="/guide">Guide</a><a href="#capabilities">Capabilities</a><a href="#how">How it works</a><a href="#faq">FAQ</a></div>
             <div><b>Company</b><a href="#">About</a><a href="#">Contact</a></div>
             <div><b>Legal</b><a href="#">Privacy</a><a href="#">Terms</a></div>
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© 2026 ClassGrid.</span>
+          <span>© 2026 {APP_NAME}.</span>
           <span>Built for the people who actually build the timetable.</span>
         </div>
       </footer>

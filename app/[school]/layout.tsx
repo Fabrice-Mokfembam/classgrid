@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { ReactNode } from "react";
-import { CalendarDays } from "lucide-react";
 import { SchoolGate } from "./school-gate";
+import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
 
 // Synchronous on purpose: everything that needs a network round trip (SchoolGate,
 // below) is pushed behind Suspense so the route transition itself is never blocked
@@ -10,7 +10,7 @@ import { SchoolGate } from "./school-gate";
 // a slow click. Now the URL/shell commit immediately and the real content streams in.
 export default function SchoolLayout({ children, params }: { children: ReactNode; params: Promise<{ school: string }> }) {
   return (
-    <Suspense fallback={<div className="app-loading"><CalendarDays /></div>}>
+    <Suspense fallback={<div className="app-loading"><img className="app-loading-logo" src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></div>}>
       <SchoolGate params={params}>{children}</SchoolGate>
     </Suspense>
   );

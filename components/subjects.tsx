@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -33,6 +33,7 @@ export function Subjects() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [subjectModal, setSubjectModal] = useState<{ mode: "add" } | { mode: "edit"; subject: SchoolSubject } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -70,14 +71,22 @@ export function Subjects() {
     load();
   }
 
+  const filteredSubjects = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return subjectsList;
+    return subjectsList.filter(s => [s.name, s.code ?? "", s.status].some(value => value.toLowerCase().includes(q)));
+  }, [subjectsList, search]);
+
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
-  return <TableShell title="All subjects" count={subjectsList.length} button="Add subject" onAdd={() => setSubjectModal({ mode: "add" })}>
+  return <TableShell title="All subjects" count={filteredSubjects.length} button="Add subject" onAdd={() => setSubjectModal({ mode: "add" })} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search subjects…">
     {loading ? <div className="data-table"><div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div><RowsSkeleton className="data-row subjects" cols={4} rows={5} /></div> : subjectsList.length === 0 ? (
       <div className="empty-inspector"><BookOpen /><h3>No subjects yet</h3><p>Add your first subject to get started. Once you have some, head to Levels → Manage subjects to decide which levels teach them and their weekly periods.</p></div>
+    ) : filteredSubjects.length === 0 ? (
+      <div className="empty-inspector"><BookOpen /><h3>No subjects found</h3><p>Try a different subject name, code, or status.</p></div>
     ) : <div className="data-table">
       <div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div>
-      {subjectsList.map(s => <div className="data-row subjects" key={s.id}>
+      {filteredSubjects.map(s => <div className="data-row subjects" key={s.id}>
         <span><i className="color-dot" style={{ background: s.color }} /><b>{s.name}</b></span>
         <span>{s.code ?? "—"}</span>
         <span><i className="color-swatch" style={{ background: s.color }} />{s.color}</span>

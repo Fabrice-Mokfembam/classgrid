@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen, CalendarDays, ChevronDown, Clock3, FileCheck2,
-  LayoutDashboard, LogOut, Menu, School2, Search, Settings,
+  HelpCircle, LayoutDashboard, LogOut, Menu, School2, Search, Settings,
   Sparkles, UsersRound, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
+import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
 import { loadSetupProgress, type SetupProgress } from "@/lib/setup-progress";
 import { ErrorBoundary, ErrorState, Skel } from "@/components/shared";
 
@@ -18,6 +19,9 @@ function roleLabel(role: string | null): string {
 }
 function initialsOf(name: string): string {
   return name.split(" ").filter(Boolean).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+}
+function SchoolLogoMark({ logoUrl, name, className = "" }: { logoUrl: string | null; name: string | null; className?: string }) {
+  return <span className={`school-logo-mark ${className}`}><img src={logoUrl ?? DEFAULT_LOGO_URL} alt={`${name ?? APP_NAME} logo`} /></span>;
 }
 
 // ─── Re-exports so existing page files keep working without changes ────────────
@@ -80,7 +84,7 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
   const router = useRouter();
   const pathname = usePathname();
   const page = pageFromPathname(pathname, schoolSlug);
-  const { schoolId, schoolSlug: realSlug, schoolName, academicYearId, academicYearName, role, fullName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
+  const { schoolId, schoolSlug: realSlug, schoolName, schoolLogoUrl, academicYearId, academicYearName, role, fullName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
   const [progress, setProgress] = useState<SetupProgress | null>(null);
 
   useEffect(() => {
@@ -110,12 +114,12 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
     <div className="app-shell">
       <aside className={mobile ? "sidebar open" : "sidebar"}>
         <div className="brand">
-          <span className="brand-mark"><CalendarDays /></span>
-          ClassGrid
+          <span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>
+          {APP_NAME}
           <button className="mobile-close" onClick={() => setMobile(false)}><X /></button>
         </div>
         <div className="school-switch">
-          <span><School2 /></span>
+          <SchoolLogoMark logoUrl={schoolLogoUrl} name={schoolName} />
           <div>
             <b>{schoolLoading ? <Skel w="80px" /> : schoolName ?? "Your school"}</b>
             <small>{schoolLoading ? <Skel w="50px" /> : academicYearName ?? ""}</small>
@@ -137,13 +141,16 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           ))}
         </nav>
         <div className="sidebar-bottom">
+          <Link className="nav-item guide-link" href="/guide" onClick={() => setMobile(false)}>
+            <HelpCircle /> Setup guide
+          </Link>
           <div className="setup-mini">
             <b>Setup progress <span>{progress ? `${progress.percent}%` : <Skel w="30px" sm />}</span></b>
             <div className="progress"><i style={{ width: `${progress?.percent ?? 0}%` }} /></div>
             <small>{progress ? `${progress.completedCount} of ${progress.totalSteps} steps completed` : <Skel w="100px" sm />}</small>
           </div>
           <button className="nav-item" onClick={async () => {
-            if (!window.confirm("Sign out of ClassGrid?")) return;
+            if (!window.confirm(`Sign out of ${APP_NAME}?`)) return;
             const supabase = createClient();
             if (supabase) await supabase.auth.signOut();
             router.push("/");
@@ -161,6 +168,10 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           <div className="crumb">School workspace <span>/</span> {titles[page][0]}</div>
           <div className="top-actions">
             <button className="icon-btn"><Search /></button>
+            <div className="top-school">
+              <SchoolLogoMark logoUrl={schoolLogoUrl} name={schoolName} className="small" />
+              <div><b>{schoolLoading ? <Skel w="70px" /> : schoolName ?? "Your school"}</b><small>{schoolLoading ? <Skel w="40px" /> : academicYearName ?? ""}</small></div>
+            </div>
             <div className="avatar">{schoolLoading ? "" : fullName ? initialsOf(fullName) : "?"}</div>
             <div className="admin-name"><b>{schoolLoading ? <Skel w="70px" /> : fullName ?? "Unnamed admin"}</b><small>{schoolLoading ? <Skel w="90px" /> : roleLabel(role)}</small></div>
           </div>

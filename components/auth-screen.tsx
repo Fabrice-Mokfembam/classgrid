@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Eye, EyeOff, Mail, School2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Mail, School2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMySchoolSlug } from "@/lib/school-context";
+import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
 import type { SchoolProfile } from "@/lib/types";
 
 const initial: SchoolProfile = {
@@ -134,7 +135,7 @@ export function AuthScreen({ onBack }: { onBack: () => void }) {
   if (mode === "signin") return (
     <div className="auth-layout">
       <div className="auth-brand">
-        <div className="brand light"><span className="brand-mark"><CalendarDays /></span>ClassGrid</div>
+        <div className="brand light"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
         <div><span className="auth-kicker">WELCOME BACK</span><h1>Your whole school week, under control.</h1><p>Sign in to continue configuring, generating and publishing your timetables.</p></div>
         <small>Conflict-free by design.</small>
       </div>
@@ -157,7 +158,7 @@ export function AuthScreen({ onBack }: { onBack: () => void }) {
   if (awaitingConfirmation) return (
     <div className="onboarding">
       <header>
-        <div className="brand"><span className="brand-mark"><CalendarDays /></span>ClassGrid</div>
+        <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
       </header>
       <section className="setup-card confirm-card">
         <div className="setup-icon success"><Mail /></div>
@@ -172,7 +173,7 @@ export function AuthScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="onboarding">
       <header>
-        <div className="brand"><span className="brand-mark"><CalendarDays /></span>ClassGrid</div>
+        <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
         <button className="btn ghost" onClick={() => setMode("signin")}>Already registered? Sign in</button>
       </header>
       <div className="stepper">

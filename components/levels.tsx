@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Plus, School2, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -68,17 +68,21 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
     if (!supabase) return;
     setBusySubjectId(subjectId);
     if (on) {
-      const { error } = await supabase.from("level_subjects").insert({ school_id: schoolId, level_id: level.id, subject_id: subjectId, periods_per_week: 1 });
+      const { data, error } = await supabase.from("level_subjects")
+        .insert({ school_id: schoolId, level_id: level.id, subject_id: subjectId, periods_per_week: 1 })
+        .select("id, subject_id, periods_per_week, stream_label")
+        .single();
       if (error) toast.error(error.message);
+      else setRows(rs => [...rs, { id: data.id, subjectId: data.subject_id, periodsPerWeek: data.periods_per_week, streamLabel: data.stream_label, parallelGroupIds: [] }]);
     } else {
       const row = rows.find(r => r.subjectId === subjectId);
       if (row) {
         const { error } = await supabase.from("level_subjects").delete().eq("id", row.id);
         if (error) toast.error(error.message);
+        else setRows(rs => rs.filter(r => r.id !== row.id));
       }
     }
     setBusySubjectId(null);
-    await load();
   }
 
   async function updateRow(row: LevelSubjectRow, patch: { periods_per_week?: number; stream_label?: string | null }) {
@@ -86,7 +90,11 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
     if (!supabase) return;
     const { error } = await supabase.from("level_subjects").update(patch).eq("id", row.id);
     if (error) { toast.error(error.message); return; }
-    await load();
+    setRows(rs => rs.map(r => r.id === row.id ? {
+      ...r,
+      periodsPerWeek: patch.periods_per_week ?? r.periodsPerWeek,
+      streamLabel: patch.stream_label === undefined ? r.streamLabel : patch.stream_label,
+    } : r));
   }
 
   async function toggleGroupMembership(row: LevelSubjectRow, groupId: string, on: boolean) {
@@ -96,15 +104,21 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
       ? await supabase.from("level_subject_parallel_groups").insert({ level_subject_id: row.id, parallel_group_id: groupId })
       : await supabase.from("level_subject_parallel_groups").delete().eq("level_subject_id", row.id).eq("parallel_group_id", groupId);
     if (error) { toast.error(error.message); return; }
-    await load();
+    setRows(rs => rs.map(r => r.id === row.id ? {
+      ...r,
+      parallelGroupIds: on ? [...new Set([...r.parallelGroupIds, groupId])] : r.parallelGroupIds.filter(id => id !== groupId),
+    } : r));
   }
 
   async function addGroup() {
     const supabase = createClient();
     if (!supabase) return;
-    const { error } = await supabase.from("parallel_subject_groups").insert({ school_id: schoolId, level_id: level.id, name: null });
+    const { data, error } = await supabase.from("parallel_subject_groups")
+      .insert({ school_id: schoolId, level_id: level.id, name: null })
+      .select("id, name")
+      .single();
     if (error) { toast.error(error.message); return; }
-    await load();
+    setGroups(gs => [...gs, { id: data.id, name: data.name }]);
   }
 
   async function renameGroup(group: ParallelGroup, name: string) {
@@ -112,7 +126,7 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
     if (!supabase) return;
     const { error } = await supabase.from("parallel_subject_groups").update({ name: name || null }).eq("id", group.id);
     if (error) toast.error(error.message);
-    await load();
+    else setGroups(gs => gs.map(g => g.id === group.id ? { ...g, name: name || null } : g));
   }
 
   async function deleteGroup(group: ParallelGroup) {
@@ -121,7 +135,8 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
     if (!supabase) return;
     const { error } = await supabase.from("parallel_subject_groups").delete().eq("id", group.id);
     if (error) { toast.error(error.message); return; }
-    await load();
+    setGroups(gs => gs.filter(g => g.id !== group.id));
+    setRows(rs => rs.map(r => ({ ...r, parallelGroupIds: r.parallelGroupIds.filter(id => id !== group.id) })));
   }
 
   return <div className="modal-backdrop">
@@ -135,7 +150,10 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
               return <div className="level-subject-row" key={s.id}>
                 <label className="check"><input type="checkbox" checked={!!row} disabled={busySubjectId === s.id} onChange={e => toggleSubject(s.id, e.target.checked)} /><i className="color-dot" style={{ background: s.color }} />{s.name}</label>
                 {row && <>
-                  <input type="number" min={1} value={row.periodsPerWeek} onChange={e => updateRow(row, { periods_per_week: Math.max(1, Number(e.target.value) || 1) })} aria-label={`${s.name} periods per week`} />
+                  <input type="number" min={1} value={row.periodsPerWeek} onChange={e => {
+                    const periods = Math.max(1, Number(e.target.value) || 1);
+                    setRows(rs => rs.map(r => r.id === row.id ? { ...r, periodsPerWeek: periods } : r));
+                  }} onBlur={e => updateRow(row, { periods_per_week: Math.max(1, Number(e.target.value) || 1) })} aria-label={`${s.name} periods per week`} />
                   <input value={row.streamLabel ?? ""} onChange={e => setRows(rs => rs.map(r => r.id === row.id ? { ...r, streamLabel: e.target.value } : r))} onBlur={e => updateRow(row, { stream_label: e.target.value.trim() || null })} placeholder="Stream (optional)" aria-label={`${s.name} stream label`} />
                   {groups.length === 0 ? <small className="field-hint">No groups yet</small> : <div className="group-toggle-list">
                     {groups.map(g => <label className={`group-toggle${row.parallelGroupIds.includes(g.id) ? " on" : ""}`} key={g.id}>
@@ -180,6 +198,7 @@ export function Levels() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [levelSubjectCounts, setLevelSubjectCounts] = useState<Map<string, number>>(new Map());
   const [subjectsModalLevel, setSubjectsModalLevel] = useState<Level | null>(null);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -259,6 +278,12 @@ export function Levels() {
     load();
   }
 
+  const filteredSections = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sections;
+    return sections.filter(s => [s.name, s.levelName, s.status, String(s.studentCount ?? "")].some(value => value.toLowerCase().includes(q)));
+  }, [sections, search]);
+
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   return <div className="levels-page">
@@ -273,12 +298,14 @@ export function Levels() {
       </div>}
     </section>
 
-    <TableShell title="Class sections" count={sections.length} button="Add class" onAdd={() => { if (levels.length === 0) { toast.error("Add a level first"); return; } setSectionModal({ mode: "add" }); }}>
+    <TableShell title="Class sections" count={filteredSections.length} button="Add class" onAdd={() => { if (levels.length === 0) { toast.error("Add a level first"); return; } setSectionModal({ mode: "add" }); }} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search classes…">
       {loading ? <div className="data-table"><div className="data-row head levels"><span>Class</span><span>Level</span><span>Students</span><span>Status</span><span></span></div><RowsSkeleton className="data-row levels" cols={4} rows={4} /></div> : sections.length === 0 ? (
         <div className="empty-inspector"><School2 /><h3>No class sections yet</h3><p>Add your first class section to get started.</p></div>
+      ) : filteredSections.length === 0 ? (
+        <div className="empty-inspector"><School2 /><h3>No class sections found</h3><p>Try a different class name, level, student count, or status.</p></div>
       ) : <div className="data-table">
         <div className="data-row head levels"><span>Class</span><span>Level</span><span>Students</span><span>Status</span><span></span></div>
-        {sections.map(s => <div className="data-row levels" key={s.id}>
+        {filteredSections.map(s => <div className="data-row levels" key={s.id}>
           <span><b>{s.name}</b><small>Actual timetable class</small></span>
           <span>{s.levelName}</span>
           <span>{s.studentCount ?? "—"}</span>

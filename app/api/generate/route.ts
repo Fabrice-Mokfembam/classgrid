@@ -194,7 +194,7 @@ export async function POST(request: Request) {
   const qualityScore = totalRequired === 0 ? 100 : Math.max(0, Math.round((scheduled / totalRequired) * 100) - result.softWarnings.length);
 
   await supabase.from("generation_runs").update({ status: "completed", progress: 100, completed_at: new Date().toISOString() }).eq("id", run.id);
-  await supabase.from("timetables").update({ quality_score: qualityScore }).eq("id", targetTimetableId);
+  await supabase.from("timetables").update({ quality_score: qualityScore, status: "draft", published_at: null, published_by: null }).eq("id", targetTimetableId);
 
   return NextResponse.json({
     timetableId: targetTimetableId, generationRunId: run.id, scheduled, totalRequired,

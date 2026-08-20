@@ -9,6 +9,7 @@ export type SchoolContextValue = {
   schoolSlug: string | null;
   academicYearId: string | null;
   schoolName: string | null;
+  schoolLogoUrl: string | null;
   academicYearName: string | null;
   role: string | null;
   fullName: string | null;
@@ -18,7 +19,7 @@ export type SchoolContextValue = {
 };
 
 const initial: Omit<SchoolContextValue, "retry"> = {
-  schoolId: null, schoolSlug: null, academicYearId: null, schoolName: null, academicYearName: null, role: null, fullName: null, loading: true, error: null,
+  schoolId: null, schoolSlug: null, academicYearId: null, schoolName: null, schoolLogoUrl: null, academicYearName: null, role: null, fullName: null, loading: true, error: null,
 };
 
 const SchoolContext = createContext<SchoolContextValue>({ ...initial, retry: () => {} });
@@ -59,7 +60,7 @@ export function SchoolProvider({ children }: { children: ReactNode }) {
 
         const { data: membership, error: membershipError } = await supabase
           .from("school_memberships")
-          .select("role, school_id, schools(name, slug)")
+          .select("role, school_id, schools(name, slug, logo_url)")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -81,6 +82,7 @@ export function SchoolProvider({ children }: { children: ReactNode }) {
             schoolSlug: (schoolRow as { slug: string } | null)?.slug ?? null,
             academicYearId: year?.id ?? null,
             schoolName: (schoolRow as { name: string } | null)?.name ?? null,
+            schoolLogoUrl: (schoolRow as { logo_url: string | null } | null)?.logo_url ?? null,
             academicYearName: year?.name ?? null,
             role: membership.role,
             fullName: profile?.full_name ?? null,
