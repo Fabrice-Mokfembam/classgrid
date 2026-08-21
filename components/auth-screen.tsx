@@ -75,9 +75,9 @@ function Field({ label, required, error, hint, wide, children }: { label: string
   );
 }
 
-export function AuthScreen({ onBack }: { onBack: () => void }) {
+export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => void; initialMode?: "signin" | "signup" }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signup");
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState(initial);
   const [password, setPassword] = useState("");

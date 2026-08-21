@@ -87,13 +87,27 @@ export function Assignments() {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) return;
     const payload = { school_id: schoolId, academic_year_id: academicYearId, teacher_id: values.teacherId, subject_id: values.subjectId, class_section_id: values.classSectionId, periods_per_week: values.periodsPerWeek, pattern: values.pattern };
-    const { error } = assignmentModal?.mode === "edit"
-      ? await supabase.from("teaching_assignments").update(payload).eq("id", assignmentModal.assignment.id)
-      : await supabase.from("teaching_assignments").insert(payload);
+    const { data, error } = assignmentModal?.mode === "edit"
+      ? await supabase.from("teaching_assignments").update(payload).eq("id", assignmentModal.assignment.id).select("id, periods_per_week, pattern, status, teacher_id, subject_id, class_section_id").single()
+      : await supabase.from("teaching_assignments").insert(payload).select("id, periods_per_week, pattern, status, teacher_id, subject_id, class_section_id").single();
     if (error) { toast.error(error.code === "23505" ? "This teacher, subject and class combination already exists." : error.message); return; }
+    const savedAssignment: TeachingAssignment = {
+      id: data.id,
+      teacherId: data.teacher_id,
+      teacherName: teacherOptions.find(option => option.id === data.teacher_id)?.name ?? "—",
+      subjectId: data.subject_id,
+      subjectName: subjectOptions.find(option => option.id === data.subject_id)?.name ?? "—",
+      classSectionId: data.class_section_id,
+      className: classOptions.find(option => option.id === data.class_section_id)?.name ?? "—",
+      periodsPerWeek: data.periods_per_week,
+      pattern: data.pattern,
+      status: data.status,
+    };
+    setAssignmentsList(assignments => assignmentModal?.mode === "edit"
+      ? assignments.map(assignment => assignment.id === savedAssignment.id ? savedAssignment : assignment)
+      : [...assignments, savedAssignment]);
     toast.success(assignmentModal?.mode === "edit" ? "Assignment updated" : "Assignment created");
     setAssignmentModal(null);
-    load();
   }
 
   async function deleteAssignment(assignment: TeachingAssignment) {
@@ -104,7 +118,7 @@ export function Assignments() {
     if (error) { toast.error(error.code === "23503" ? "This assignment is used by a published timetable — remove it there first." : error.message); return; }
     toast.success("Assignment removed");
     setOpenMenuId(null);
-    load();
+    setAssignmentsList(assignments => assignments.filter(item => item.id !== assignment.id));
   }
 
   const filteredAssignments = useMemo(() => {

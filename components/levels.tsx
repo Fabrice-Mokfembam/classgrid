@@ -224,21 +224,38 @@ export function Levels() {
 
   useEffect(() => { if (!schoolLoading) load(); }, [schoolLoading, load]);
 
+  async function refreshLevelSubjectCount(levelId: string) {
+    const supabase = createClient();
+    if (!supabase || !schoolId) return;
+    const { count, error } = await supabase.from("level_subjects").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("level_id", levelId);
+    if (error) { toast.error(error.message); return; }
+    setLevelSubjectCounts(counts => {
+      const next = new Map(counts);
+      next.set(levelId, count ?? 0);
+      return next;
+    });
+  }
+
   async function saveLevel(name: string) {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) return;
     if (levelModal?.mode === "edit") {
-      const { error } = await supabase.from("levels").update({ name }).eq("id", levelModal.level.id);
+      const { data, error } = await supabase.from("levels").update({ name }).eq("id", levelModal.level.id).select("id, name, sort_order, status").single();
       if (error) { toast.error(error.message); return; }
+      const savedLevel: Level = { id: data.id, name: data.name, sortOrder: data.sort_order, status: data.status };
+      setLevels(items => items.map(level => level.id === savedLevel.id ? savedLevel : level));
+      setSections(items => items.map(section => section.levelId === savedLevel.id ? { ...section, levelName: savedLevel.name } : section));
       toast.success("Level updated");
     } else {
       const nextOrder = levels.length ? Math.max(...levels.map(l => l.sortOrder)) + 1 : 1;
-      const { error } = await supabase.from("levels").insert({ school_id: schoolId, academic_year_id: academicYearId, name, sort_order: nextOrder });
+      const { data, error } = await supabase.from("levels").insert({ school_id: schoolId, academic_year_id: academicYearId, name, sort_order: nextOrder }).select("id, name, sort_order, status").single();
       if (error) { toast.error(error.message); return; }
+      const savedLevel: Level = { id: data.id, name: data.name, sortOrder: data.sort_order, status: data.status };
+      setLevels(items => [...items, savedLevel].sort((a, b) => a.sortOrder - b.sortOrder));
+      setLevelSubjectCounts(counts => new Map(counts).set(savedLevel.id, 0));
       toast.success("Level added");
     }
     setLevelModal(null);
-    load();
   }
 
   async function deleteLevel(level: Level) {
@@ -251,20 +268,35 @@ export function Levels() {
       return;
     }
     toast.success("Level removed");
-    load();
+    setLevels(items => items.filter(item => item.id !== level.id));
+    setLevelSubjectCounts(counts => {
+      const next = new Map(counts);
+      next.delete(level.id);
+      return next;
+    });
   }
 
   async function saveSection(values: { name: string; levelId: string; studentCount: string }) {
     const supabase = createClient();
     if (!supabase || !schoolId || !academicYearId) return;
     const payload = { school_id: schoolId, academic_year_id: academicYearId, level_id: values.levelId, name: values.name, student_count: values.studentCount ? Number(values.studentCount) : null };
-    const { error } = sectionModal?.mode === "edit"
-      ? await supabase.from("class_sections").update(payload).eq("id", sectionModal.section.id)
-      : await supabase.from("class_sections").insert(payload);
+    const { data, error } = sectionModal?.mode === "edit"
+      ? await supabase.from("class_sections").update(payload).eq("id", sectionModal.section.id).select("id, name, student_count, status, level_id").single()
+      : await supabase.from("class_sections").insert(payload).select("id, name, student_count, status, level_id").single();
     if (error) { toast.error(error.message); return; }
+    const savedSection: ClassSection = {
+      id: data.id,
+      name: data.name,
+      levelId: data.level_id,
+      levelName: levels.find(level => level.id === data.level_id)?.name ?? "—",
+      studentCount: data.student_count,
+      status: data.status,
+    };
+    setSections(items => (sectionModal?.mode === "edit"
+      ? items.map(section => section.id === savedSection.id ? savedSection : section)
+      : [...items, savedSection]).sort((a, b) => a.name.localeCompare(b.name)));
     toast.success(sectionModal?.mode === "edit" ? "Class section updated" : "Class section created");
     setSectionModal(null);
-    load();
   }
 
   async function deleteSection(section: ClassSection) {
@@ -275,7 +307,7 @@ export function Levels() {
     if (error) { toast.error(error.message); return; }
     toast.success("Class section removed");
     setOpenMenuId(null);
-    load();
+    setSections(items => items.filter(item => item.id !== section.id));
   }
 
   const filteredSections = useMemo(() => {
@@ -340,6 +372,10 @@ export function Levels() {
 
     {levelModal && <LevelModal mode={levelModal.mode} initial={levelModal.mode === "edit" ? levelModal.level : undefined} close={() => setLevelModal(null)} onSave={saveLevel} />}
     {sectionModal && <ClassSectionModal mode={sectionModal.mode} initial={sectionModal.mode === "edit" ? sectionModal.section : undefined} levels={levels} close={() => setSectionModal(null)} onSave={saveSection} />}
-    {subjectsModalLevel && schoolId && <LevelSubjectsModal level={subjectsModalLevel} schoolId={schoolId} close={() => { setSubjectsModalLevel(null); load(); }} />}
+    {subjectsModalLevel && schoolId && <LevelSubjectsModal level={subjectsModalLevel} schoolId={schoolId} close={() => {
+      const levelId = subjectsModalLevel.id;
+      setSubjectsModalLevel(null);
+      void refreshLevelSubjectCount(levelId);
+    }} />}
   </div>;
 }

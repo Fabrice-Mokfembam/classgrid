@@ -46,6 +46,7 @@ export function Teachers() {
   const [subjectOptions, setSubjectOptions] = useState<SchoolSubject[]>([]);
   const [classOptions, setClassOptions] = useState<{ id: string; name: string; levelId: string }[]>([]);
   const [levelSubjects, setLevelSubjects] = useState<{ levelId: string; subjectId: string; periodsPerWeek: number }[]>([]);
+  const [weeklySlotCount, setWeeklySlotCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [teacherModal, setTeacherModal] = useState<{ mode: "add" } | { mode: "edit"; teacher: SchoolTeacher } | null>(null);
@@ -54,7 +55,7 @@ export function Teachers() {
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    if (!supabase || !schoolId) { setTeachersList([]); setSubjectOptions([]); setClassOptions([]); setLevelSubjects([]); setLoading(false); return; }
+    if (!supabase || !schoolId) { setTeachersList([]); setSubjectOptions([]); setClassOptions([]); setLevelSubjects([]); setWeeklySlotCount(0); setLoading(false); return; }
     setLoading(true); setLoadError(null);
     const [teachersRes, subjectsRes, linksRes] = await Promise.all([
       supabase.from("teachers").select("id, full_name, teacher_code, email, phone, status").eq("school_id", schoolId).order("full_name"),
@@ -64,22 +65,27 @@ export function Teachers() {
     const err0 = firstError(teachersRes, subjectsRes, linksRes);
     if (err0) { setLoadError(err0); setLoading(false); return; }
     let requiredByTeacher = new Map<string, number>();
-    let availableByTeacher = new Map<string, number>();
+    let unavailableByTeacher = new Map<string, number>();
+    let totalWeeklySlots = 0;
     if (academicYearId) {
-      const [assignmentsRes, availabilityRes, classesRes, levelSubjectsRes] = await Promise.all([
+      const [assignmentsRes, availabilityRes, classesRes, levelSubjectsRes, daysRes, periodsRes] = await Promise.all([
         supabase.from("teaching_assignments").select("teacher_id, periods_per_week").eq("school_id", schoolId).eq("academic_year_id", academicYearId),
-        supabase.from("teacher_availability").select("teacher_id").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_available", true),
+        supabase.from("teacher_availability").select("teacher_id").eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_available", false),
         supabase.from("class_sections").select("id, name, level_id").eq("school_id", schoolId).eq("academic_year_id", academicYearId).order("name"),
         supabase.from("level_subjects").select("level_id, subject_id, periods_per_week").eq("school_id", schoolId),
+        supabase.from("working_days").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("is_active", true),
+        supabase.from("period_slots").select("id", { count: "exact", head: true }).eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("kind", "lesson"),
       ]);
-      const err1 = firstError(assignmentsRes, availabilityRes, classesRes, levelSubjectsRes);
+      const err1 = firstError(assignmentsRes, availabilityRes, classesRes, levelSubjectsRes, daysRes, periodsRes);
       if (err1) { setLoadError(err1); setLoading(false); return; }
+      totalWeeklySlots = (daysRes.count ?? 0) * (periodsRes.count ?? 0);
       (assignmentsRes.data ?? []).forEach(a => requiredByTeacher.set(a.teacher_id, (requiredByTeacher.get(a.teacher_id) ?? 0) + a.periods_per_week));
-      (availabilityRes.data ?? []).forEach(a => availableByTeacher.set(a.teacher_id, (availableByTeacher.get(a.teacher_id) ?? 0) + 1));
+      (availabilityRes.data ?? []).forEach(a => unavailableByTeacher.set(a.teacher_id, (unavailableByTeacher.get(a.teacher_id) ?? 0) + 1));
       setClassOptions((classesRes.data ?? []).map(c => ({ id: c.id, name: c.name, levelId: c.level_id })));
       setLevelSubjects((levelSubjectsRes.data ?? []).map(ls => ({ levelId: ls.level_id, subjectId: ls.subject_id, periodsPerWeek: ls.periods_per_week })));
+      setWeeklySlotCount(totalWeeklySlots);
     } else {
-      setClassOptions([]); setLevelSubjects([]);
+      setClassOptions([]); setLevelSubjects([]); setWeeklySlotCount(0);
     }
     const linksByTeacher = new Map<string, { id: string; name: string }[]>();
     (linksRes.data ?? []).forEach(l => {
@@ -90,7 +96,7 @@ export function Teachers() {
     });
     setTeachersList((teachersRes.data ?? []).map((t): SchoolTeacher => {
       const links = linksByTeacher.get(t.id) ?? [];
-      return { id: t.id, fullName: t.full_name, teacherCode: t.teacher_code, email: t.email, phone: t.phone, status: t.status, subjectIds: links.map(l => l.id), subjectNames: links.map(l => l.name), requiredPeriods: requiredByTeacher.get(t.id) ?? 0, availableSlots: availableByTeacher.get(t.id) ?? 0 };
+      return { id: t.id, fullName: t.full_name, teacherCode: t.teacher_code, email: t.email, phone: t.phone, status: t.status, subjectIds: links.map(l => l.id), subjectNames: links.map(l => l.name), requiredPeriods: requiredByTeacher.get(t.id) ?? 0, availableSlots: Math.max(0, totalWeeklySlots - (unavailableByTeacher.get(t.id) ?? 0)) };
     }));
     setSubjectOptions((subjectsRes.data ?? []).map((s): SchoolSubject => ({ id: s.id, name: s.name, code: s.code, color: s.color, status: s.status })));
     setLoading(false);
@@ -103,16 +109,20 @@ export function Teachers() {
     if (!supabase || !schoolId) return;
     const payload = { school_id: schoolId, full_name: values.fullName, teacher_code: values.teacherCode || null, email: values.email || null, phone: values.phone || null };
     let teacherId: string | undefined = teacherModal?.mode === "edit" ? teacherModal.teacher.id : undefined;
+    let teacherStatus: SchoolTeacher["status"] = teacherModal?.mode === "edit" ? teacherModal.teacher.status : "active";
     if (teacherModal?.mode === "edit") {
-      const { error } = await supabase.from("teachers").update(payload).eq("id", teacherModal.teacher.id);
+      const { data, error } = await supabase.from("teachers").update(payload).eq("id", teacherModal.teacher.id).select("id, status").single();
       if (error) { toast.error(error.message); return; }
+      teacherStatus = data.status;
     } else {
-      const { data, error } = await supabase.from("teachers").insert(payload).select("id").single();
+      const { data, error } = await supabase.from("teachers").insert(payload).select("id, status").single();
       if (error) { toast.error(error.message); return; }
       teacherId = data.id;
+      teacherStatus = data.status;
     }
     if (teacherId) {
-      await supabase.from("teacher_subjects").delete().eq("teacher_id", teacherId);
+      const { error: unlinkError } = await supabase.from("teacher_subjects").delete().eq("teacher_id", teacherId);
+      if (unlinkError) { toast.error(unlinkError.message); return; }
       if (values.subjectIds.length) {
         const { error: linkError } = await supabase.from("teacher_subjects").insert(values.subjectIds.map(subjectId => ({ teacher_id: teacherId, subject_id: subjectId, school_id: schoolId })));
         if (linkError) { toast.error(linkError.message); return; }
@@ -132,10 +142,32 @@ export function Teachers() {
           if (assignError) toast.error(assignError.message);
         }
       }
+
+      const [assignmentsRes, availabilityRes] = academicYearId ? await Promise.all([
+        supabase.from("teaching_assignments").select("periods_per_week").eq("teacher_id", teacherId).eq("academic_year_id", academicYearId),
+        supabase.from("teacher_availability").select("id").eq("teacher_id", teacherId).eq("academic_year_id", academicYearId).eq("is_available", false),
+      ]) : [{ data: [], error: null }, { data: [], error: null }];
+      const refreshError = assignmentsRes.error?.message ?? availabilityRes.error?.message ?? null;
+      if (refreshError) { toast.error(refreshError); return; }
+      const subjectNames = values.subjectIds.map(subjectId => subjectOptions.find(subject => subject.id === subjectId)?.name ?? "—");
+      const savedTeacher: SchoolTeacher = {
+        id: teacherId,
+        fullName: values.fullName,
+        teacherCode: values.teacherCode || null,
+        email: values.email || null,
+        phone: values.phone || null,
+        status: teacherStatus,
+        subjectIds: values.subjectIds,
+        subjectNames,
+        requiredPeriods: (assignmentsRes.data ?? []).reduce((sum, assignment) => sum + assignment.periods_per_week, 0),
+        availableSlots: Math.max(0, weeklySlotCount - (availabilityRes.data ?? []).length),
+      };
+      setTeachersList(teachers => (teacherModal?.mode === "edit"
+        ? teachers.map(teacher => teacher.id === savedTeacher.id ? savedTeacher : teacher)
+        : [...teachers, savedTeacher]).sort((a, b) => a.fullName.localeCompare(b.fullName)));
     }
     toast.success(teacherModal?.mode === "edit" ? "Teacher updated" : "Teacher created");
     setTeacherModal(null);
-    load();
   }
 
   async function deleteTeacher(teacher: SchoolTeacher) {
@@ -146,7 +178,7 @@ export function Teachers() {
     if (error) { toast.error(error.code === "23503" ? `Remove teaching assignments for ${teacher.fullName} before deleting them.` : error.message); return; }
     toast.success("Teacher removed");
     setOpenMenuId(null);
-    load();
+    setTeachersList(teachers => teachers.filter(item => item.id !== teacher.id));
   }
 
   const filteredTeachers = useMemo(() => {

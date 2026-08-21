@@ -53,7 +53,7 @@ export default function Home() {
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
-  const goToAuth = () => router.push("/auth");
+  const goToAuth = (mode: "signin" | "signup" = "signup") => router.push(mode === "signin" ? "/auth?mode=signin" : "/auth");
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +85,7 @@ export default function Home() {
           <a href="#faq">FAQ</a>
         </div>
         <div className="nav-actions">
-          <button className="btn ghost" onClick={() => goToAuth()}>Sign in</button>
+          <button className="btn ghost" onClick={() => goToAuth("signin")}>Sign in</button>
           <button className="btn primary" onClick={() => goToAuth()}>Create school account <ArrowRight size={16} /></button>
         </div>
         <button className="nav-toggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen(v => !v)}>
@@ -99,7 +99,7 @@ export default function Home() {
           <a href="#how" onClick={() => setNavOpen(false)}>How it works</a>
           <a href="#faq" onClick={() => setNavOpen(false)}>FAQ</a>
           <hr />
-          <button className="btn ghost" onClick={() => goToAuth()}>Sign in</button>
+          <button className="btn ghost" onClick={() => goToAuth("signin")}>Sign in</button>
           <button className="btn primary" onClick={() => goToAuth()}>Create school account <ArrowRight size={16} /></button>
         </div>
       )}

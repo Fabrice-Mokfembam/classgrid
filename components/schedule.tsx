@@ -59,12 +59,13 @@ export function Schedule() {
     if (saturday) {
       const { error } = await supabase.from("working_days").update({ is_active: sixDays }).eq("id", saturday.id);
       if (error) { toast.error(error.message); return; }
+      setWorkingDays(days => days.map(day => day.id === saturday.id ? { ...day, isActive: sixDays } : day));
     } else if (sixDays) {
-      const { error } = await supabase.from("working_days").insert({ school_id: schoolId, academic_year_id: academicYearId, weekday: 6, name: "Saturday", sort_order: 6, is_active: true });
+      const { data, error } = await supabase.from("working_days").insert({ school_id: schoolId, academic_year_id: academicYearId, weekday: 6, name: "Saturday", sort_order: 6, is_active: true }).select("id, name, weekday, sort_order, is_active").single();
       if (error) { toast.error(error.message); return; }
+      setWorkingDays(days => [...days, { id: data.id, name: data.name, weekday: data.weekday, sortOrder: data.sort_order, isActive: data.is_active }].sort((a, b) => a.sortOrder - b.sortOrder));
     }
     toast.success(sixDays ? "Saturday added to the teaching week" : "Saturday removed from the teaching week");
-    load();
   }
 
   async function savePeriod(values: { name: string; kind: "lesson" | "break"; startTime: string; endTime: string }) {
@@ -74,21 +75,24 @@ export function Schedule() {
     const dayBlock = values.startTime < "12:00" ? "morning" : "afternoon";
     if (periodModal?.mode === "edit") {
       const periodNumber = values.kind === "lesson" ? (periodModal.period.periodNumber ?? (periodList.filter(p => p.kind === "lesson" && p.id !== periodModal.period.id).length + 1)) : null;
-      const { error } = await supabase.from("period_slots").update({ name: values.name, kind: values.kind, start_time: values.startTime, end_time: values.endTime, period_number: periodNumber, day_block: dayBlock }).eq("id", periodModal.period.id);
+      const { data, error } = await supabase.from("period_slots").update({ name: values.name, kind: values.kind, start_time: values.startTime, end_time: values.endTime, period_number: periodNumber, day_block: dayBlock }).eq("id", periodModal.period.id).select("id, name, kind, start_time, end_time, period_number, sort_order").single();
       if (error) { toast.error(error.message); return; }
+      const savedPeriod: SchedulePeriod = { id: data.id, name: data.name, kind: data.kind, startTime: data.start_time, endTime: data.end_time, periodNumber: data.period_number, sortOrder: data.sort_order };
+      setPeriodList(periods => periods.map(period => period.id === savedPeriod.id ? savedPeriod : period));
     } else {
       const nextSort = periodList.length ? Math.max(...periodList.map(p => p.sortOrder)) + 1 : 1;
       const lessonCount = periodList.filter(p => p.kind === "lesson").length;
-      const { error } = await supabase.from("period_slots").insert({
+      const { data, error } = await supabase.from("period_slots").insert({
         school_id: schoolId, academic_year_id: academicYearId, name: values.name, kind: values.kind,
         start_time: values.startTime, end_time: values.endTime, sort_order: nextSort,
         period_number: values.kind === "lesson" ? lessonCount + 1 : null, day_block: dayBlock,
-      });
+      }).select("id, name, kind, start_time, end_time, period_number, sort_order").single();
       if (error) { toast.error(error.message); return; }
+      const savedPeriod: SchedulePeriod = { id: data.id, name: data.name, kind: data.kind, startTime: data.start_time, endTime: data.end_time, periodNumber: data.period_number, sortOrder: data.sort_order };
+      setPeriodList(periods => [...periods, savedPeriod].sort((a, b) => a.sortOrder - b.sortOrder));
     }
     toast.success(periodModal?.mode === "edit" ? "Period updated" : "Period added");
     setPeriodModal(null);
-    load();
   }
 
   async function deletePeriod(period: SchedulePeriod) {
@@ -102,7 +106,7 @@ export function Schedule() {
     }
     toast.success("Period removed");
     setOpenMenuId(null);
-    load();
+    setPeriodList(periods => periods.filter(item => item.id !== period.id));
   }
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;

@@ -56,10 +56,11 @@ export function Generate() {
 
   useEffect(() => { if (!schoolLoading) load(); }, [schoolLoading, load]);
 
-  const availableSlots = dayCount * lessonPeriodCount;
+  const slotsPerClass = dayCount * lessonPeriodCount;
+  const totalClassCapacity = slotsPerClass * classCount;
   const scheduleReady = dayCount > 0 && lessonPeriodCount > 0;
   const assignmentsReady = assignmentCount > 0;
-  const capacityReady = availableSlots >= weeklyLessons;
+  const capacityReady = classCount > 0 && totalClassCapacity >= weeklyLessons;
   const canGenerate = scheduleReady && assignmentsReady && !generating;
 
   async function run() {
@@ -91,13 +92,13 @@ export function Generate() {
         <div><span>Classes</span><b>{classCount}</b></div>
         <div><span>Teaching assignments</span><b>{assignmentCount}</b></div>
         <div><span>Weekly lessons</span><b>{weeklyLessons}</b></div>
-        <div><span>Available slots</span><b>{availableSlots}</b></div>
+        <div><span>Class capacity</span><b>{totalClassCapacity}</b></div>
       </div>}
       {loading ? <div className="check-list">{Array.from({ length: 4 }).map((_, i) => <div className="validation-item" key={i}><span className="skeleton" style={{ width: 18, height: 18, borderRadius: "50%" }} /><div><Skel w="140px" /></div></div>)}</div> : <div className="check-list">
         <ValidationItem good={scheduleReady} title="School structure" text={scheduleReady ? `${dayCount} teaching days and ${lessonPeriodCount} lesson periods configured` : "Set up teaching days and lesson periods on School schedule first"} />
         <ValidationItem good={teacherCount > 0} title="Teachers" text={teacherCount > 0 ? `${teacherCount} active teachers` : "No active teachers yet"} />
         <ValidationItem good={assignmentsReady} title="Teaching assignments" text={assignmentsReady ? `${assignmentCount} active assignments` : "No teaching assignments yet"} />
-        <ValidationItem good={capacityReady} title="Capacity" text={capacityReady ? "Enough weekly slots for the required lessons" : `Only ${availableSlots} slots available for ${weeklyLessons} required lessons`} />
+        <ValidationItem good={capacityReady} title="Class capacity" text={capacityReady ? `${classCount} classes × ${slotsPerClass} weekly slots provides enough room` : `Only ${totalClassCapacity} class slots available for ${weeklyLessons} required lessons`} />
       </div>}
       <button className="btn primary huge" onClick={run} disabled={!canGenerate || loading}><Sparkles /> {generating ? "Generating…" : "Generate conflict-free timetable"}</button>
       <p className="center muted">Generation runs on the server. You can safely leave this page and return later.</p>

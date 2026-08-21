@@ -1,9 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthScreen } from "@/components/auth-screen";
 
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter();
-  return <AuthScreen onBack={() => router.push("/")} />;
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get("mode") === "signin" ? "signin" : "signup";
+  return <AuthScreen initialMode={initialMode} onBack={() => router.push("/")} />;
+}
+
+export default function AuthPage() {
+  return <Suspense fallback={null}>
+    <AuthPageContent />
+  </Suspense>;
 }

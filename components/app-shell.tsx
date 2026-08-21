@@ -116,7 +116,7 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
         <div className="brand">
           <span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>
           {APP_NAME}
-          <button className="mobile-close" onClick={() => setMobile(false)}><X /></button>
+          <button className="mobile-close" aria-label="Close navigation" onClick={() => setMobile(false)}><X /></button>
         </div>
         <div className="school-switch">
           <SchoolLogoMark logoUrl={schoolLogoUrl} name={schoolName} />
@@ -164,7 +164,7 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
 
       <div className="app-main">
         <header className="topbar">
-          <button className="menu-btn" onClick={() => setMobile(true)}><Menu /></button>
+          <button className="menu-btn" aria-label="Open navigation" onClick={() => setMobile(true)}><Menu /></button>
           <div className="crumb">School workspace <span>/</span> {titles[page][0]}</div>
           <div className="top-actions">
             <button className="icon-btn"><Search /></button>

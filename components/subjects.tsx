@@ -51,13 +51,16 @@ export function Subjects() {
     const supabase = createClient();
     if (!supabase || !schoolId) return;
     const payload = { school_id: schoolId, name: values.name, code: values.code || null, color: values.color };
-    const { error } = subjectModal?.mode === "edit"
-      ? await supabase.from("subjects").update(payload).eq("id", subjectModal.subject.id)
-      : await supabase.from("subjects").insert(payload);
+    const { data, error } = subjectModal?.mode === "edit"
+      ? await supabase.from("subjects").update(payload).eq("id", subjectModal.subject.id).select("id, name, code, color, status").single()
+      : await supabase.from("subjects").insert(payload).select("id, name, code, color, status").single();
     if (error) { toast.error(error.message); return; }
+    const savedSubject: SchoolSubject = { id: data.id, name: data.name, code: data.code, color: data.color, status: data.status };
+    setSubjectsList(subjects => (subjectModal?.mode === "edit"
+      ? subjects.map(subject => subject.id === savedSubject.id ? savedSubject : subject)
+      : [...subjects, savedSubject]).sort((a, b) => a.name.localeCompare(b.name)));
     toast.success(subjectModal?.mode === "edit" ? "Subject updated" : "Subject created");
     setSubjectModal(null);
-    load();
   }
 
   async function deleteSubject(subject: SchoolSubject) {
@@ -68,7 +71,7 @@ export function Subjects() {
     if (error) { toast.error(error.code === "23503" ? `Remove teaching assignments using ${subject.name} before deleting it.` : error.message); return; }
     toast.success("Subject removed");
     setOpenMenuId(null);
-    load();
+    setSubjectsList(subjects => subjects.filter(item => item.id !== subject.id));
   }
 
   const filteredSubjects = useMemo(() => {
