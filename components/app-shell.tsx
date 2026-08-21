@@ -4,13 +4,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen, CalendarDays, ChevronDown, Clock3, FileCheck2,
-  HelpCircle, LayoutDashboard, LogOut, Menu, School2, Search, Settings,
-  Sparkles, UsersRound, X,
+  LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
+  School2, Search, Settings, Sparkles, UsersRound, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
-import { loadSetupProgress, type SetupProgress } from "@/lib/setup-progress";
 import { ErrorBoundary, ErrorState, Skel } from "@/components/shared";
 
 function roleLabel(role: string | null): string {
@@ -81,20 +80,23 @@ function pageFromPathname(pathname: string, schoolSlug: string): Page {
 // refresh lands back on the same page.
 export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; children: ReactNode }) {
   const [mobile, setMobile] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const page = pageFromPathname(pathname, schoolSlug);
-  const { schoolId, schoolSlug: realSlug, schoolName, schoolLogoUrl, academicYearId, academicYearName, role, fullName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
-  const [progress, setProgress] = useState<SetupProgress | null>(null);
+  const { schoolId, schoolSlug: realSlug, schoolName, schoolLogoUrl, academicYearName, role, fullName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
 
   useEffect(() => {
-    if (!schoolId || !academicYearId) return;
-    const supabase = createClient();
-    if (!supabase) return;
-    let cancelled = false;
-    loadSetupProgress(supabase, schoolId, academicYearId).then(p => { if (!cancelled) setProgress(p); });
-    return () => { cancelled = true; };
-  }, [schoolId, academicYearId]);
+    setSidebarCollapsed(window.localStorage.getItem("classgrid-sidebar-collapsed") === "true");
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed(collapsed => {
+      const next = !collapsed;
+      window.localStorage.setItem("classgrid-sidebar-collapsed", String(next));
+      return next;
+    });
+  }
 
   // The URL slug is taken on faith by the server guard; once the real membership
   // loads client-side, correct a stale/wrong one here.
@@ -111,11 +113,21 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       <aside className={mobile ? "sidebar open" : "sidebar"}>
         <div className="brand">
           <span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>
-          {APP_NAME}
+          <span className="brand-name">{APP_NAME}</span>
+          <button
+            className="sidebar-toggle"
+            type="button"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!sidebarCollapsed}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={toggleSidebar}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </button>
           <button className="mobile-close" aria-label="Close navigation" onClick={() => setMobile(false)}><X /></button>
         </div>
         <div className="school-switch">
@@ -132,30 +144,24 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
               key={n.id}
               href={pagePath(schoolSlug, n.id)}
               className={page === n.id ? "nav-item active" : "nav-item"}
+              title={sidebarCollapsed ? n.label : undefined}
+              aria-label={sidebarCollapsed ? n.label : undefined}
               onClick={() => setMobile(false)}
             >
               <n.icon />
-              {n.label}
+              <span className="nav-label">{n.label}</span>
               {n.id === "generate" && <span className="nav-dot" />}
             </Link>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <Link className="nav-item guide-link" href="/guide" onClick={() => setMobile(false)}>
-            <HelpCircle /> Setup guide
-          </Link>
-          <div className="setup-mini">
-            <b>Setup progress <span>{progress ? `${progress.percent}%` : <Skel w="30px" sm />}</span></b>
-            <div className="progress"><i style={{ width: `${progress?.percent ?? 0}%` }} /></div>
-            <small>{progress ? `${progress.completedCount} of ${progress.totalSteps} steps completed` : <Skel w="100px" sm />}</small>
-          </div>
-          <button className="nav-item" onClick={async () => {
+          <button className="nav-item sidebar-signout" title={sidebarCollapsed ? "Sign out" : undefined} aria-label={sidebarCollapsed ? "Sign out" : undefined} onClick={async () => {
             if (!window.confirm(`Sign out of ${APP_NAME}?`)) return;
             const supabase = createClient();
             if (supabase) await supabase.auth.signOut();
             router.push("/");
           }}>
-            <LogOut /> Sign out
+            <LogOut /> <span className="nav-label">Sign out</span>
           </button>
         </div>
       </aside>

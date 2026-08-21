@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
-import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, AlertTriangle, FileCheck2, School2, Sparkles, UsersRound } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, AlertTriangle, FileCheck2, HelpCircle, School2, Sparkles, UsersRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { SetupStep } from "@/lib/types";
@@ -148,7 +148,10 @@ export function Dashboard() {
         <div className="progress"><i style={{ width: `${percent}%` }} /></div>
         <small>{completedCount} of {STEP_ORDER.length} steps completed</small>
       </div>
-      <button className="btn primary" onClick={() => go(nextStep?.page ?? "generate")}>{nextStep ? "Continue setup" : "Go to Generate"} <ArrowRight /></button>
+      <div className="setup-actions">
+        <button className="btn" onClick={() => router.push("/guide")}><HelpCircle /> Setup guide</button>
+        <button className="btn primary" onClick={() => go(nextStep?.page ?? "generate")}>{nextStep ? "Continue setup" : "Go to Generate"} <ArrowRight /></button>
+      </div>
     </section>
     <section className="stats-grid">
       <Stat icon={UsersRound} n={String(stats.teachersActive)} label="Teachers" note={stats.teachersTotal === stats.teachersActive ? "All active" : `${stats.teachersTotal - stats.teachersActive} inactive`} />
