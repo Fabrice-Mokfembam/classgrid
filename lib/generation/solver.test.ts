@@ -167,3 +167,62 @@ describe("solve — parallel subject groups", () => {
     expect(result.unscheduled).toHaveLength(1);
   });
 });
+
+describe("solve — coverage-first repair", () => {
+  it("gives every assignment one period before adding extra periods", () => {
+    const days = makeDays(1), periods = makePeriods(3);
+    const assignments = [
+      makeAssignment({ id: "maths", teacherId: "t1", subjectId: "maths", classSectionId: "c1", periodsPerWeek: 3, maxPerDay: 3 }),
+      makeAssignment({ id: "biology", teacherId: "t2", subjectId: "biology", classSectionId: "c1", periodsPerWeek: 3, maxPerDay: 3 }),
+    ];
+
+    const result = solve(baseInput({ days, periods, assignments, coverageFirst: true }));
+
+    expect(new Set(result.placed.map(lesson => lesson.assignmentId))).toEqual(new Set(["maths", "biology"]));
+    expect(result.placed).toHaveLength(3);
+  });
+
+  it("keeps other classes as fixed blockers while repairing one class", () => {
+    const days = makeDays(1), periods = makePeriods(2);
+    const assignments = [
+      makeAssignment({ id: "fixed", teacherId: "shared", subjectId: "history", classSectionId: "other", periodsPerWeek: 1 }),
+      makeAssignment({ id: "maths", teacherId: "shared", subjectId: "maths", classSectionId: "target", periodsPerWeek: 1 }),
+    ];
+    const preplaced = [{ assignmentId: "fixed", teacherId: "shared", subjectId: "history", classSectionId: "other", dayId: days[0].id, periodId: periods[0].id }];
+
+    const result = solve(baseInput({ days, periods, assignments, preplaced, coverageFirst: true }));
+
+    expect(result.placed).toHaveLength(1);
+    expect(result.placed[0].periodId).toBe(periods[1].id);
+  });
+
+  it("does not prioritize another period for a subject already covered by a locked lesson", () => {
+    const days = makeDays(1), periods = makePeriods(2);
+    const assignments = [
+      makeAssignment({ id: "maths", teacherId: "t1", subjectId: "maths", classSectionId: "target", periodsPerWeek: 3, maxPerDay: 3 }),
+      makeAssignment({ id: "biology", teacherId: "t2", subjectId: "biology", classSectionId: "target", periodsPerWeek: 1 }),
+    ];
+    const preplaced = [{ assignmentId: "maths", teacherId: "t1", subjectId: "maths", classSectionId: "target", dayId: days[0].id, periodId: periods[0].id }];
+
+    const result = solve(baseInput({ days, periods, assignments, preplaced, coverageFirst: true }));
+
+    expect(result.placed).toHaveLength(1);
+    expect(result.placed[0].assignmentId).toBe("biology");
+    expect(result.placed[0].periodId).toBe(periods[1].id);
+  });
+
+  it("blocks the substitute teacher used by a locked lesson", () => {
+    const days = makeDays(1), periods = makePeriods(2);
+    const assignments = [
+      makeAssignment({ id: "maths", teacherId: "usual", subjectId: "maths", classSectionId: "target", periodsPerWeek: 1 }),
+      makeAssignment({ id: "history", teacherId: "substitute", subjectId: "history", classSectionId: "other", periodsPerWeek: 1 }),
+    ];
+    const preplaced = [{ assignmentId: "maths", teacherId: "substitute", subjectId: "maths", classSectionId: "target", dayId: days[0].id, periodId: periods[0].id }];
+
+    const result = solve(baseInput({ days, periods, assignments, preplaced }));
+
+    expect(result.placed).toHaveLength(1);
+    expect(result.placed[0].assignmentId).toBe("history");
+    expect(result.placed[0].periodId).toBe(periods[1].id);
+  });
+});

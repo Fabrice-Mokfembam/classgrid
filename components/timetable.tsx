@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, Download, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, UnlockKeyhole } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, CalendarDays, ChartNoAxesColumn, CheckCircle2, Download, GitMerge, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, UnlockKeyhole, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
@@ -12,6 +12,22 @@ type ValidationIssue = {
   id: string;
   title: string;
   text: string;
+};
+
+type ClassCoverageRow = {
+  subjectId: string;
+  subjectName: string;
+  subjectColor: string;
+  teacherNames: string[];
+  scheduled: number;
+  required: number;
+};
+
+type PendingDrop = {
+  dragged: TimetableEntry;
+  target: TimetableEntry;
+  dayId: string;
+  periodId: string;
 };
 
 export function Timetable() {
@@ -28,7 +44,11 @@ export function Timetable() {
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [selected, setSelected] = useState<TimetableEntry | null>(null);
   const [dragged, setDragged] = useState<TimetableEntry | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const [dropAction, setDropAction] = useState<"swap" | "parallel" | null>(null);
+  const [changingTeacher, setChangingTeacher] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [repairingClass, setRepairingClass] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validationChecked, setValidationChecked] = useState(false);
@@ -36,6 +56,10 @@ export function Timetable() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [entriesError, setEntriesError] = useState<string | null>(null);
   const [entriesLoading, setEntriesLoading] = useState(false);
+  const [coverageOpen, setCoverageOpen] = useState(false);
+  const [coverageLoading, setCoverageLoading] = useState(false);
+  const [coverageError, setCoverageError] = useState<string | null>(null);
+  const [coverageRows, setCoverageRows] = useState<ClassCoverageRow[]>([]);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -69,7 +93,7 @@ export function Timetable() {
     if (view === "teacher" && !teacherId) { setEntries([]); return; }
     setEntriesError(null); setEntriesLoading(true);
     let query = supabase.from("timetable_entries")
-      .select("id, working_day_id, period_slot_id, is_locked, subjects(name, color), teachers(full_name), class_sections(name)")
+      .select("id, subject_id, teacher_id, working_day_id, period_slot_id, is_locked, subjects(name, color), teachers(full_name), class_sections(name)")
       .eq("timetable_id", timetableInfo.id);
     if (view === "class") query = query.eq("class_section_id", classSectionId);
     if (view === "teacher") query = query.eq("teacher_id", teacherId);
@@ -79,7 +103,7 @@ export function Timetable() {
       const subject = Array.isArray(e.subjects) ? e.subjects[0] : e.subjects;
       const teacher = Array.isArray(e.teachers) ? e.teachers[0] : e.teachers;
       const classRow = Array.isArray(e.class_sections) ? e.class_sections[0] : e.class_sections;
-      return { id: e.id, dayId: e.working_day_id, periodSlotId: e.period_slot_id, isLocked: e.is_locked, subjectName: (subject as { name: string } | null)?.name ?? "—", subjectColor: (subject as { color: string } | null)?.color ?? "#3b82f6", teacherName: (teacher as { full_name: string } | null)?.full_name ?? "—", className: (classRow as { name: string } | null)?.name ?? "—" };
+      return { id: e.id, subjectId: e.subject_id, teacherId: e.teacher_id, dayId: e.working_day_id, periodSlotId: e.period_slot_id, isLocked: e.is_locked, subjectName: (subject as { name: string } | null)?.name ?? "—", subjectColor: (subject as { color: string } | null)?.color ?? "#3b82f6", teacherName: (teacher as { full_name: string } | null)?.full_name ?? "—", className: (classRow as { name: string } | null)?.name ?? "—" };
     }));
     setSelected(null);
     setValidationChecked(false);
@@ -87,6 +111,7 @@ export function Timetable() {
   }, [timetableInfo, view, classSectionId, teacherId]);
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
+  useEffect(() => { setCoverageOpen(false); }, [classSectionId, view, timetableInfo?.id]);
 
   const cells = useMemo(() => {
     const map = new Map<string, TimetableEntry[]>();
@@ -109,6 +134,29 @@ export function Timetable() {
     toast.success(next ? "Lesson locked" : "Lesson unlocked");
   }
 
+  async function changeSelectedTeacher(nextTeacherId: string) {
+    if (!selected || nextTeacherId === selected.teacherId) return;
+    const supabase = createClient();
+    if (!supabase) return;
+
+    setChangingTeacher(true);
+    const { error } = await supabase.rpc("change_timetable_entry_teacher", {
+      p_entry_id: selected.id,
+      p_teacher_id: nextTeacherId,
+    });
+    setChangingTeacher(false);
+    if (error) { toast.error(error.message); return; }
+
+    const teacherName = teacherOptions.find(teacher => teacher.id === nextTeacherId)?.name ?? "Selected teacher";
+    const updated = { ...selected, teacherId: nextTeacherId, teacherName };
+    setSelected(updated);
+    setTimetableInfo(info => info ? { ...info, status: "draft", publishedAt: null, publishedBy: null } : info);
+    setValidationChecked(false);
+    if (view === "teacher") await loadEntries();
+    else setEntries(list => list.map(entry => entry.id === selected.id ? updated : entry));
+    toast.success(`${teacherName} will teach this ${selected.subjectName} period`);
+  }
+
   async function handleDrop(dayId: string, periodId: string) {
     if (!dragged) return;
     const dragSnapshot = dragged;
@@ -117,18 +165,45 @@ export function Timetable() {
     if (destEntries.some(x => x.id === dragSnapshot.id)) return;
     if (destEntries.length > 1) { toast.error("This slot already has two parallel lessons — move one of them out first"); return; }
     const target = destEntries[0];
-    if (target?.isLocked) { toast.error("This lesson is locked and cannot be replaced"); return; }
+    if (target) {
+      setPendingDrop({ dragged: dragSnapshot, target, dayId, periodId });
+      return;
+    }
     const supabase = createClient();
     if (!supabase) return;
-    if (target) {
-      const { error } = await supabase.rpc("swap_timetable_entries", { p_entry_a: dragSnapshot.id, p_entry_b: target.id });
-      if (error) { toast.error(error.code === "23505" ? "That slot conflicts with an existing lesson for this teacher elsewhere in the timetable" : error.message.includes("locked") ? "This lesson is locked and cannot be replaced" : error.message); return; }
-      toast.success("Lessons swapped");
-    } else {
-      const { error } = await supabase.from("timetable_entries").update({ working_day_id: dayId, period_slot_id: periodId }).eq("id", dragSnapshot.id);
-      if (error) { toast.error(error.code === "23505" ? "That slot conflicts with an existing lesson for this teacher or class" : error.message); return; }
-      toast.success("Lesson moved");
+    const { error } = await supabase.rpc("move_timetable_entry", { p_entry_id: dragSnapshot.id, p_working_day_id: dayId, p_period_slot_id: periodId });
+    if (error) { toast.error(error.code === "23505" ? "That slot conflicts with an existing lesson for this teacher or class" : error.message); return; }
+    toast.success("Lesson moved");
+    setTimetableInfo(info => info ? { ...info, status: "draft", publishedAt: null, publishedBy: null } : info);
+    setValidationChecked(false);
+    loadEntries();
+  }
+
+  async function completeOccupiedDrop(action: "swap" | "parallel") {
+    if (!pendingDrop) return;
+    const supabase = createClient();
+    if (!supabase) return;
+
+    setDropAction(action);
+    const { dragged: source, target } = pendingDrop;
+    const { error } = action === "swap"
+      ? await supabase.rpc("swap_timetable_entries", { p_entry_a: source.id, p_entry_b: target.id })
+      : await supabase.rpc("make_timetable_entries_parallel", { p_dragged_entry_id: source.id, p_target_entry_id: target.id });
+    setDropAction(null);
+
+    if (error) {
+      const message = error.message.toLowerCase();
+      if (message.includes("unavailable")) toast.error(error.message);
+      else if (message.includes("locked")) toast.error("The locked lesson cannot be swapped. You can still make the subjects parallel.");
+      else if (error.code === "23505" || message.includes("conflict")) toast.error("That placement conflicts with another lesson for this teacher or class");
+      else toast.error(error.message);
+      return;
     }
+
+    setPendingDrop(null);
+    setTimetableInfo(info => info ? { ...info, status: "draft", publishedAt: null, publishedBy: null } : info);
+    setValidationChecked(false);
+    toast.success(action === "swap" ? "Lessons swapped" : `${source.subjectName} and ${target.subjectName} now run in parallel`);
     loadEntries();
   }
 
@@ -186,6 +261,61 @@ export function Timetable() {
     else toast.warning(`${issues.length} assignment period issue${issues.length === 1 ? "" : "s"} found`);
   }
 
+  async function openClassCoverage() {
+    if (!timetableInfo || !classSectionId) return;
+    setCoverageOpen(true);
+    setCoverageLoading(true);
+    setCoverageError(null);
+
+    const supabase = createClient();
+    if (!supabase) { setCoverageLoading(false); return; }
+    const [assignmentsRes, entriesRes] = await Promise.all([
+      supabase.from("teaching_assignments")
+        .select("id, subject_id, periods_per_week, subjects(id, name, color, status), teachers(full_name, status)")
+        .eq("class_section_id", classSectionId)
+        .eq("status", "active"),
+      supabase.from("timetable_entries")
+        .select("assignment_id")
+        .eq("timetable_id", timetableInfo.id)
+        .eq("class_section_id", classSectionId)
+        .not("assignment_id", "is", null),
+    ]);
+    setCoverageLoading(false);
+
+    const error = assignmentsRes.error?.message ?? entriesRes.error?.message ?? null;
+    if (error) { setCoverageError(error); return; }
+
+    const rowsBySubject = new Map<string, ClassCoverageRow>();
+    const subjectByAssignment = new Map<string, string>();
+    (assignmentsRes.data ?? []).forEach(assignment => {
+      const subject = Array.isArray(assignment.subjects) ? assignment.subjects[0] : assignment.subjects;
+      const teacher = Array.isArray(assignment.teachers) ? assignment.teachers[0] : assignment.teachers;
+      if (!subject || subject.status !== "active" || !teacher || teacher.status !== "active") return;
+
+      subjectByAssignment.set(assignment.id, assignment.subject_id);
+      const current: ClassCoverageRow = rowsBySubject.get(assignment.subject_id) ?? {
+        subjectId: assignment.subject_id,
+        subjectName: subject.name,
+        subjectColor: subject.color,
+        teacherNames: [],
+        scheduled: 0,
+        required: 0,
+      };
+      current.required += assignment.periods_per_week;
+      if (!current.teacherNames.includes(teacher.full_name)) current.teacherNames.push(teacher.full_name);
+      rowsBySubject.set(assignment.subject_id, current);
+    });
+
+    (entriesRes.data ?? []).forEach(entry => {
+      if (!entry.assignment_id) return;
+      const subjectId = subjectByAssignment.get(entry.assignment_id);
+      const row = subjectId ? rowsBySubject.get(subjectId) : undefined;
+      if (row) row.scheduled += 1;
+    });
+
+    setCoverageRows([...rowsBySubject.values()].sort((a, b) => a.subjectName.localeCompare(b.subjectName)));
+  }
+
   async function regenerateUnlocked() {
     if (!schoolId || !academicYearId || !timetableInfo) return;
     if (!window.confirm("Regenerate all unlocked lessons? Locked lessons will stay in place, but every other slot may move.")) return;
@@ -203,43 +333,54 @@ export function Timetable() {
     finally { setRegenerating(false); }
   }
 
+  async function repairClass() {
+    if (!schoolId || !academicYearId || !timetableInfo || !classSectionId) return;
+    const className = classOptions.find(option => option.id === classSectionId)?.name ?? "this class";
+    if (!window.confirm(`Repair ${className}? Its unlocked lessons may move, but locked lessons and every other class will stay unchanged.`)) return;
+
+    setRepairingClass(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ schoolId, academicYearId, timetableId: timetableInfo.id, classSectionId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Class repair failed"); return; }
+
+      const coverage = `${data.subjectsCovered}/${data.subjectsRequired} subjects`;
+      const periods = `${data.classScheduled}/${data.classRequired} periods`;
+      if (data.hardConflicts > 0) toast.warning(`${className} repaired: ${coverage}, ${periods}. Some shortages remain.`);
+      else toast.success(`${className} repaired: ${coverage}, ${periods} scheduled.`);
+
+      setTimetableInfo(info => info ? { ...info, status: "draft", qualityScore: data.qualityScore, publishedAt: null, publishedBy: null } : info);
+      setValidationChecked(false);
+      await loadEntries();
+      if (coverageOpen) await openClassCoverage();
+    } catch {
+      toast.error("Class repair failed");
+    } finally {
+      setRepairingClass(false);
+    }
+  }
+
   async function publishTimetable() {
     if (!timetableInfo) return;
     if (timetableInfo.status === "published") { toast.info("This timetable is already published"); return; }
+    if (!validationChecked) { toast.info("Validate the timetable before publishing"); return; }
+    if (validationIssues.length > 0) { toast.error("Fix all assignment period issues before publishing"); return; }
     if (!window.confirm("Publish this timetable? It will become the official timetable for this academic year.")) return;
 
     const supabase = createClient();
     if (!supabase) return;
 
     setPublishing(true);
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      setPublishing(false);
-      toast.error(userError?.message ?? "You must be signed in to publish a timetable");
-      return;
-    }
-
-    const publishedAt = new Date().toISOString();
-    if (schoolId && academicYearId) {
-      const { error: archiveError } = await supabase.from("timetables").update({ status: "archived" })
-        .eq("school_id", schoolId).eq("academic_year_id", academicYearId).eq("status", "published").neq("id", timetableInfo.id);
-      if (archiveError) {
-        setPublishing(false);
-        toast.error(archiveError.message);
-        return;
-      }
-    }
-
-    const { error } = await supabase.from("timetables").update({
-      status: "published",
-      published_at: publishedAt,
-      published_by: user.id,
-    }).eq("id", timetableInfo.id);
-
+    const { data, error } = await supabase.rpc("publish_timetable", { p_timetable_id: timetableInfo.id });
     setPublishing(false);
     if (error) { toast.error(error.message); return; }
+    const publishedAt = data as string;
 
-    setTimetableInfo(info => info ? { ...info, status: "published", publishedAt, publishedBy: user.id } : info);
+    setTimetableInfo(info => info ? { ...info, status: "published", publishedAt } : info);
     toast.success("Timetable published");
   }
 
@@ -318,12 +459,21 @@ export function Timetable() {
           <button className={view === "master" ? "active" : ""} onClick={() => setView("master")}>Master</button>
         </div>
         {view === "class" && <select value={classSectionId} onChange={e => setClassSectionId(e.target.value)}>{classOptions.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select>}
+        {view === "class" && <button className="btn" onClick={openClassCoverage}><ChartNoAxesColumn /> Class coverage</button>}
+        {view === "class" && <button className="btn" onClick={repairClass} disabled={repairingClass || regenerating}><Sparkles /> {repairingClass ? "Repairing…" : "Repair class"}</button>}
         {view === "teacher" && <select value={teacherId} onChange={e => setTeacherId(e.target.value)}>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select>}
         <button className="btn" onClick={validateTimetable} disabled={validating}><ShieldCheck /> {validating ? "Validating…" : "Validate"}</button>
-        <button className="btn" onClick={regenerateUnlocked} disabled={regenerating}><RefreshCw /> {regenerating ? "Regenerating…" : "Regenerate unlocked"}</button>
+        <button className="btn" onClick={regenerateUnlocked} disabled={regenerating || repairingClass}><RefreshCw /> {regenerating ? "Regenerating…" : "Regenerate unlocked"}</button>
         {selected && <button className="btn" onClick={toggleLock} title={selected.isLocked ? "Locked — click to unlock." : "Unlocked — click to lock."}>
           {selected.isLocked ? <LockKeyhole /> : <UnlockKeyhole />} {selected.isLocked ? "Unlock lesson" : "Lock lesson"}
         </button>}
+        {selected && <label className="lesson-teacher-control" title="Change the teacher for this lesson only">
+          <UserRound />
+          <select aria-label={`Teacher for this ${selected.subjectName} period`} value={selected.teacherId} disabled={changingTeacher} onChange={event => changeSelectedTeacher(event.target.value)}>
+            {!teacherOptions.some(teacher => teacher.id === selected.teacherId) && <option value={selected.teacherId}>{selected.teacherName}</option>}
+            {teacherOptions.map(teacher => <option value={teacher.id} key={teacher.id}>{teacher.name}</option>)}
+          </select>
+        </label>}
         <div className="tt-toolbar-actions">
           <button className="btn" onClick={downloadPdf}><Download /> Download</button>
           <button className="btn primary" onClick={publishTimetable} disabled={publishing || timetableInfo.status === "published"}>{publishing ? "Publishing…" : timetableInfo.status === "published" ? "Published" : "Publish timetable"}</button>
@@ -369,5 +519,55 @@ export function Timetable() {
         ])}
       </div>
     </section>
+    {pendingDrop && <div className="modal-backdrop" onClick={() => { if (!dropAction) setPendingDrop(null); }}>
+      <section className="modal drop-action-modal" role="dialog" aria-modal="true" aria-labelledby="drop-action-title" onClick={event => event.stopPropagation()}>
+        <div className="modal-head">
+          <div><h2 id="drop-action-title">Choose drop action</h2><p>{pendingDrop.dragged.subjectName} was dropped onto {pendingDrop.target.subjectName}.</p></div>
+          <button className="icon-btn" onClick={() => setPendingDrop(null)} disabled={!!dropAction} aria-label="Cancel drop"><X /></button>
+        </div>
+        <div className="drop-action-list">
+          <button type="button" onClick={() => completeOccupiedDrop("swap")} disabled={!!dropAction || pendingDrop.target.isLocked}>
+            <ArrowLeftRight />
+            <span><b>{dropAction === "swap" ? "Swapping…" : "Swap lessons"}</b><small>{pendingDrop.target.isLocked ? `${pendingDrop.target.subjectName} is locked and cannot move.` : `Move each lesson into the other lesson's slot.`}</small></span>
+          </button>
+          <button type="button" onClick={() => completeOccupiedDrop("parallel")} disabled={!!dropAction || pendingDrop.dragged.subjectId === pendingDrop.target.subjectId}>
+            <GitMerge />
+            <span><b>{dropAction === "parallel" ? "Saving…" : "Teach in parallel"}</b><small>{pendingDrop.dragged.subjectId === pendingDrop.target.subjectId ? "A subject cannot run in parallel with itself." : `Keep both lessons in this slot and save the pairing for this level.`}</small></span>
+          </button>
+        </div>
+        <footer><button type="button" className="btn" onClick={() => setPendingDrop(null)} disabled={!!dropAction}>Cancel</button></footer>
+      </section>
+    </div>}
+    {coverageOpen && <div className="modal-backdrop" onClick={() => setCoverageOpen(false)}>
+      <section className="modal coverage-modal" role="dialog" aria-modal="true" aria-labelledby="coverage-title" onClick={event => event.stopPropagation()}>
+        <div className="modal-head">
+          <div><h2 id="coverage-title">Class coverage</h2><p>{classOptions.find(option => option.id === classSectionId)?.name ?? "Selected class"} timetable completion</p></div>
+          <button className="icon-btn" onClick={() => setCoverageOpen(false)} aria-label="Close class coverage"><X /></button>
+        </div>
+        {coverageLoading ? <div className="coverage-loading"><Skel w="100%" /><Skel w="100%" /><Skel w="100%" /></div> : coverageError ? (
+          <div className="error-banner"><AlertTriangle /><span>{coverageError}</span><button className="btn" onClick={openClassCoverage}>Retry</button></div>
+        ) : <>
+          <div className="coverage-summary">
+            <div><span>Subjects scheduled</span><b>{coverageRows.filter(row => row.scheduled > 0).length}/{coverageRows.length}</b></div>
+            <div><span>Weekly periods</span><b>{coverageRows.reduce((sum, row) => sum + row.scheduled, 0)}/{coverageRows.reduce((sum, row) => sum + row.required, 0)}</b></div>
+            <div><span>Subjects complete</span><b>{coverageRows.filter(row => row.scheduled === row.required).length}/{coverageRows.length}</b></div>
+          </div>
+          {coverageRows.length === 0 ? <div className="empty-inspector"><ChartNoAxesColumn /><h3>No subjects expected</h3><p>Add teaching assignments for this class to see coverage.</p></div> : <div className="coverage-list">
+            {coverageRows.map(row => {
+              const difference = row.required - row.scheduled;
+              const complete = difference === 0;
+              return <div className="coverage-row" key={row.subjectId}>
+                <i className="color-dot" style={{ background: row.subjectColor }} />
+                <div className="coverage-subject"><b>{row.subjectName}</b><small>{row.teacherNames.join(", ")}</small></div>
+                <div className="coverage-meter"><span><i style={{ width: `${Math.min(100, row.required ? row.scheduled / row.required * 100 : 0)}%`, background: complete ? "var(--green)" : "var(--orange)" }} /></span></div>
+                <strong>{row.scheduled}/{row.required} periods</strong>
+                <em className={complete ? "complete" : "issue"}>{complete ? <><CheckCircle2 /> Complete</> : <><AlertTriangle /> {difference > 0 ? `${difference} missing` : `${Math.abs(difference)} extra`}</>}</em>
+              </div>;
+            })}
+          </div>}
+        </>}
+        <footer><button className="btn primary" onClick={() => setCoverageOpen(false)}>Done</button></footer>
+      </section>
+    </div>}
   </div>;
 }

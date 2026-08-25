@@ -189,7 +189,7 @@ export function Dashboard() {
     </section>
     <section className="panel quick">
       <PanelTitle title="Recommended setup order" />
-      <p style={{ fontSize: 11, color: "var(--muted)", margin: "-6px 0 4px" }}>Each step depends on the one before it — assignments in particular need subjects configured per level first.</p>
+      <p className="setup-order-description">Each step depends on the one before it — assignments in particular need subjects configured per level first.</p>
       <SetupOrderItem n={1} title="Levels" text="Broad groupings like Form 1 or Primary" onClick={() => go("levels")} />
       <SetupOrderItem n={2} title="Subjects" text="Your school's subject catalog" onClick={() => go("subjects")} />
       <SetupOrderItem n={3} title="Subjects per level" text="Weekly periods and any parallel groups — Levels page, Manage subjects" onClick={() => go("levels")} />

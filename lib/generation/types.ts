@@ -22,6 +22,7 @@ export type SolverInput = {
   unavailable: Set<string>; // `${teacherId}|${dayId}|${periodId}` entries explicitly marked unavailable
   preplaced?: PlacedLesson[]; // already-locked lessons the solver must work around (regenerate-unlocked)
   parallelSubjectPairs?: Set<string>; // `${classSectionId}|${subjectIdMin}|${subjectIdMax}` (sorted) — subject pairs allowed to share one class/slot
+  coverageFirst?: boolean; // protect one lesson per assignment before filling additional required periods
   nodeBudget?: number;
   timeBudgetMs?: number;
 };

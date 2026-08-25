@@ -154,7 +154,6 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
                     const periods = Math.max(1, Number(e.target.value) || 1);
                     setRows(rs => rs.map(r => r.id === row.id ? { ...r, periodsPerWeek: periods } : r));
                   }} onBlur={e => updateRow(row, { periods_per_week: Math.max(1, Number(e.target.value) || 1) })} aria-label={`${s.name} periods per week`} />
-                  <input value={row.streamLabel ?? ""} onChange={e => setRows(rs => rs.map(r => r.id === row.id ? { ...r, streamLabel: e.target.value } : r))} onBlur={e => updateRow(row, { stream_label: e.target.value.trim() || null })} placeholder="Stream (optional)" aria-label={`${s.name} stream label`} />
                   {groups.length === 0 ? <small className="field-hint">No groups yet</small> : <div className="group-toggle-list">
                     {groups.map(g => <label className={`group-toggle${row.parallelGroupIds.includes(g.id) ? " on" : ""}`} key={g.id}>
                       <input type="checkbox" checked={row.parallelGroupIds.includes(g.id)} onChange={e => toggleGroupMembership(row, g.id, e.target.checked)} />

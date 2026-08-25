@@ -215,30 +215,47 @@ export function solve(input: SolverInput): SolverResult {
     const day = daysById.get(p.dayId);
     const period = periodsById.get(p.periodId);
     if (!assignment || !day || !period) continue;
-    place(assignment, day, [period], state);
+    // A locked lesson may have a one-period substitute teacher. It still counts
+    // toward the original assignment, but blocks the substitute's timetable.
+    place({ ...assignment, teacherId: p.teacherId, subjectId: p.subjectId, classSectionId: p.classSectionId }, day, [period], state);
     preplacedByAssignment.set(p.assignmentId, (preplacedByAssignment.get(p.assignmentId) ?? 0) + 1);
   }
 
   const allUnits = buildUnits(input.assignments, preplacedByAssignment);
   const unitsById = new Map(allUnits.map(u => [u.id, u]));
 
-  const domainSize = new Map(allUnits.map(u => [u.id, getCandidates(u, days, doublePairs, lessonPeriods, state, input).length]));
-  const orderedUnits = allUnits.slice().sort((a, b) => (domainSize.get(a.id) ?? 0) - (domainSize.get(b.id) ?? 0));
-
   const placements = new Map<string, Candidate>();
   const budget: Budget = { nodes: 0, maxNodes: input.nodeBudget ?? 100_000, start: Date.now(), maxMs: input.timeBudgetMs ?? 8000 };
-
-  let remaining = orderedUnits;
   let timedOut = false;
-  while (remaining.length > 0) {
-    try {
+
+  const scheduleWithFallback = (units: Unit[]) => {
+    const domainSize = new Map(units.map(u => [u.id, getCandidates(u, days, doublePairs, lessonPeriods, state, input).length]));
+    let remaining = units.slice().sort((a, b) => (domainSize.get(a.id) ?? 0) - (domainSize.get(b.id) ?? 0));
+    while (remaining.length > 0) {
       const ok = backtrack(remaining, 0, days, doublePairs, lessonPeriods, state, input, placements, budget);
-      if (ok) { remaining = []; break; }
+      if (ok) break;
       remaining = remaining.slice(1);
-    } catch (e) {
-      if (e instanceof BudgetExceeded) { timedOut = true; break; }
-      throw e;
     }
+  };
+
+  try {
+    if (input.coverageFirst) {
+      const firstUnitByAssignment = new Map<string, Unit>();
+      for (const unit of allUnits) {
+        if ((preplacedByAssignment.get(unit.assignment.id) ?? 0) === 0 && !firstUnitByAssignment.has(unit.assignment.id)) {
+          firstUnitByAssignment.set(unit.assignment.id, unit);
+        }
+      }
+      const coverageUnits = [...firstUnitByAssignment.values()];
+      const coverageIds = new Set(coverageUnits.map(unit => unit.id));
+      scheduleWithFallback(coverageUnits);
+      scheduleWithFallback(allUnits.filter(unit => !coverageIds.has(unit.id)));
+    } else {
+      scheduleWithFallback(allUnits);
+    }
+  } catch (e) {
+    if (e instanceof BudgetExceeded) timedOut = true;
+    else throw e;
   }
 
   const unscheduledByAssignment = new Map<string, { assignment: SolverAssignment; missing: number }>();
