@@ -46,6 +46,31 @@ const WITH = [
   "Class, teacher and master views are the same underlying data",
 ];
 
+const TRUSTED_SCHOOLS = ["Cambridge College", "St Agnes School", "Marist College", "Sacred Heart College", "Bishop Rogan College"];
+
+const BUILT_DIFFERENT = [
+  { icon: ShieldCheck, title: "Auto conflict detection", text: "Find teacher, class and availability clashes before they become school-day problems." },
+  { icon: Sparkles, title: "Smart repair tools", text: "Regenerate unlocked lessons and repair class gaps without losing fixed lessons." },
+  { icon: CalendarDays, title: "Real-time updates", text: "Change availability, periods or assignments and generate from the latest inputs." },
+  { icon: UsersRound, title: "Role-based access", text: "Keep timetable work in the hands of the right administrators." },
+];
+
+const FEATURE_GROUPS = [
+  { icon: Clock3, title: "Academic schedules", text: "Flexible teaching days, periods, breaks and academic-year structure." },
+  { icon: UsersRound, title: "Teacher management", text: "Manage availability, workloads and assignments from one workspace." },
+  { icon: School2, title: "Classes and resources", text: "Organize levels, class sections, subjects and parallel groups." },
+  { icon: FileCheck2, title: "Reports and exports", text: "Export class, teacher and master timetable PDFs." },
+  { icon: ShieldCheck, title: "Audit and validation", text: "Track issues, quality score, locked lessons and publish status." },
+  { icon: BookOpen, title: "Guided setup", text: "A built-in order helps schools enter the right data first." },
+];
+
+const PROOF_POINTS = [
+  { icon: ShieldCheck, title: "Always accurate", text: "Validation keeps class and teacher conflicts visible." },
+  { icon: LockKeyhole, title: "Locked lessons safe", text: "Keep important manual edits during regeneration." },
+  { icon: Layers, title: "Scalable", text: "Works from small schools to larger institutions." },
+  { icon: CheckCircle2, title: "Private by design", text: "School data stays inside its own workspace." },
+];
+
 const FAQS = [
   { q: "Will this work with our academic calendar and curriculum?", a: "Yes. Teaching days, periods, breaks and levels are fully configurable per school and academic year, so the schedule matches your calendar rather than the other way around." },
   { q: "What happens to lessons already scheduled if a teacher becomes unavailable?", a: "Update their availability and re-run generation for the unlocked lessons only. Anything you've manually locked stays exactly where you put it." },
@@ -190,33 +215,39 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="compare section alt-bg">
-        <Reveal className="section-head">
-          <span className="kicker">The problem</span>
-          <h2>Timetabling shouldn't take a week every term.</h2>
-          <p>Most schools still build their timetable by hand, then spend the first few weeks of term fixing the clashes nobody caught.</p>
-        </Reveal>
-        <div className="compare-grid">
-          <MotionCard className="compare-card without">
-            <h3>Without ClassGrid</h3>
-            <ul>{WITHOUT.map(t => <li key={t}><X /> {t}</li>)}</ul>
-          </MotionCard>
-          <MotionCard className="compare-card with">
-            <h3>With ClassGrid</h3>
-            <ul>{WITH.map(t => <li key={t}><CheckCircle2 /> {t}</li>)}</ul>
-          </MotionCard>
+      <section className="trust-strip">
+        <span>Trusted by schools planning cleaner weeks</span>
+        <div>
+          {TRUSTED_SCHOOLS.map(name => <b key={name}><ShieldCheck />{name}</b>)}
         </div>
       </section>
 
-      <section className="how section" id="how">
-        <Reveal className="section-head">
-          <span className="kicker">How it works</span>
-          <h2>From a blank workspace to a published timetable.</h2>
+      <section className="different-section" id="capabilities">
+        <Reveal className="different-copy">
+          <span className="kicker">Built different</span>
+          <h2>Timetabling should never be a headache.</h2>
+          <p>ClassGrid removes the complexity from scheduling so your staff can focus on what matters: teaching.</p>
         </Reveal>
-        <div className="steps">
-          {STEPS.map(s => (
-            <Reveal className="step-card" key={s.n} delay={Number(s.n) * 0.04}>
-              <span>{s.n}</span>
+        <div className="different-grid">
+          {BUILT_DIFFERENT.map((item, index) => (
+            <MotionCard className="different-card" key={item.title}>
+              <span><item.icon /></span>
+              <b>{item.title}</b>
+              <p>{item.text}</p>
+            </MotionCard>
+          ))}
+        </div>
+      </section>
+
+      <section className="timeline-section" id="how">
+        <Reveal className="timeline-head">
+          <span className="kicker">How it works</span>
+          <h2>From blank slate to published in minutes.</h2>
+        </Reveal>
+        <div className="timeline-steps">
+          {STEPS.map((s, index) => (
+            <Reveal className="timeline-step" key={s.n} delay={index * 0.05}>
+              <span><b>{index + 1}</b></span>
               <h3>{s.title}</h3>
               <p>{s.text}</p>
             </Reveal>
@@ -224,42 +255,35 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="capabilities section alt-bg" id="capabilities">
-        <Reveal className="section-head">
-          <span className="kicker">Capabilities</span>
-          <h2>Everything the timetable office actually needs.</h2>
-        </Reveal>
-        <div className="cap-grid">
-          {CAPABILITIES.map(c => (
-            <MotionCard className="cap-card" key={c.title}>
-              <span><c.icon /></span>
-              <b>{c.title}</b>
-              <p>{c.text}</p>
-            </MotionCard>
+      <section className="feature-showcase">
+        <div className="feature-showcase-main">
+          <Reveal className="feature-showcase-copy" direction="left">
+            <span className="kicker">Powerful by design</span>
+            <h2>Everything a modern timetable office needs.</h2>
+            <p>From scheduling to reporting, ClassGrid brings everything together in one focused platform.</p>
+            <button className="btn showcase-btn" onClick={() => goToAuth()}>Explore all features <ArrowRight size={16} /></button>
+          </Reveal>
+          <div className="feature-showcase-grid">
+            {FEATURE_GROUPS.map((feature, index) => (
+              <Reveal key={feature.title} delay={index * 0.04}>
+                <span><feature.icon /></span>
+                <div><b>{feature.title}</b><small>{feature.text}</small></div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+        <div className="proof-strip">
+          {PROOF_POINTS.map(point => (
+            <div key={point.title}><span><point.icon /></span><b>{point.title}</b><small>{point.text}</small></div>
           ))}
         </div>
       </section>
 
-      <section className="guarantee">
-        <div className="section guarantee-layout">
-          <Reveal className="guarantee-copy" direction="left">
-            <span className="kicker">Guaranteed, not just checked</span>
-            <h2>Four rules every generated timetable follows.</h2>
-            <p>These aren't validation warnings you can dismiss — they're enforced at generation time, and enforced again at the database level.</p>
-          </Reveal>
-          <div className="guarantee-grid">
-            <Reveal delay={0.03}><LockKeyhole /><div><b>No teacher clashes</b><small>A teacher is only ever in one class at a time.</small></div></Reveal>
-            <Reveal delay={0.08}><LockKeyhole /><div><b>No class clashes</b><small>A class receives one lesson per period, no exceptions.</small></div></Reveal>
-            <Reveal delay={0.13}><ShieldCheck /><div><b>Availability respected</b><small>Unavailable slots are never used when generating.</small></div></Reveal>
-            <Reveal delay={0.18}><Sparkles /><div><b>Balanced distribution</b><small>Lessons are spread through the week instead of stacked.</small></div></Reveal>
-          </div>
-        </div>
-      </section>
-
       <section className="faq section" id="faq">
-        <Reveal className="section-head center">
+        <Reveal className="section-head faq-copy">
           <span className="kicker">FAQ</span>
-          <h2>Questions administrators ask first.</h2>
+          <h2>We've got answers.</h2>
+          <p>These are the questions school administrators usually ask before building their first timetable.</p>
         </Reveal>
         <Reveal className="faq-list">
           {FAQS.map(f => (
