@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, X } from "lucide-react";
+import { BookOpen, MoreHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { SchoolSubject } from "@/lib/types";
-import { ErrorState, firstError, RowsSkeleton, TableShell } from "@/components/shared";
+import { ErrorState, Explainer, firstError, RowsSkeleton, TableShell } from "@/components/shared";
 
 const SUBJECT_COLOR_PRESETS = ["#3b82f6", "#8b5cf6", "#22a06b", "#f97362", "#a855f7", "#f59e0b"];
 
@@ -34,6 +34,7 @@ export function Subjects() {
   const [subjectModal, setSubjectModal] = useState<{ mode: "add" } | { mode: "edit"; subject: SchoolSubject } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -76,13 +77,29 @@ export function Subjects() {
 
   const filteredSubjects = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return subjectsList;
-    return subjectsList.filter(s => [s.name, s.code ?? "", s.status].some(value => value.toLowerCase().includes(q)));
-  }, [subjectsList, search]);
+    return subjectsList.filter(subject => {
+      if (statusFilter !== "all" && subject.status !== statusFilter) return false;
+      return !q || [subject.name, subject.code ?? "", subject.status].some(value => value.toLowerCase().includes(q));
+    });
+  }, [subjectsList, search, statusFilter]);
+
+  const activeCount = subjectsList.filter(subject => subject.status === "active").length;
+  const inactiveCount = subjectsList.length - activeCount;
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
-  return <TableShell title="All subjects" count={filteredSubjects.length} button="Add subject" onAdd={() => setSubjectModal({ mode: "add" })} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search subjects…">
+  return <div className="subjects-page">
+    <Explainer title="This is the school-wide subject catalogue">Adding a subject here makes it available to the school. You still choose which levels teach it and set its weekly periods from Levels & classes.</Explainer>
+    <section className="subjects-overview" aria-label="Subject summary">
+      <div><span>Total subjects</span><b>{subjectsList.length}</b></div>
+      <div><span>Active</span><b>{activeCount}</b></div>
+      <div><span>Inactive</span><b>{inactiveCount}</b></div>
+    </section>
+    <TableShell title="Subject catalogue" count={filteredSubjects.length} button="Add subject" onAdd={() => setSubjectModal({ mode: "add" })} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search subjects…" toolbarExtra={
+      <div className="segmented subject-status-filter" aria-label="Filter subjects by status">
+        {(["all", "active", "inactive"] as const).map(status => <button type="button" key={status} className={statusFilter === status ? "active" : ""} onClick={() => setStatusFilter(status)}>{status[0].toUpperCase() + status.slice(1)}</button>)}
+      </div>
+    }>
     {loading ? <div className="data-table"><div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div><RowsSkeleton className="data-row subjects" cols={4} rows={5} /></div> : subjectsList.length === 0 ? (
       <div className="empty-inspector"><BookOpen /><h3>No subjects yet</h3><p>Add your first subject to get started. Once you have some, head to Levels → Manage subjects to decide which levels teach them and their weekly periods.</p></div>
     ) : filteredSubjects.length === 0 ? (
@@ -91,21 +108,22 @@ export function Subjects() {
       <div className="data-row head subjects"><span>Subject</span><span>Code</span><span>Display colour</span><span>Status</span><span></span></div>
       {filteredSubjects.map(s => <div className="data-row subjects" key={s.id}>
         <span><i className="color-dot" style={{ background: s.color }} /><b>{s.name}</b></span>
-        <span>{s.code ?? "—"}</span>
-        <span><i className="color-swatch" style={{ background: s.color }} />{s.color}</span>
+        <span><i className="subject-code">{s.code ?? "—"}</i></span>
+        <span className="subject-colour"><i className="color-swatch" style={{ background: s.color }} /><small>{s.color}</small></span>
         <span><i className={s.status === "active" ? "status-pill success" : "status-pill"}>{s.status === "active" ? "Active" : "Inactive"}</i></span>
         <div className="row-menu">
-          <button className="more" onClick={() => setOpenMenuId(openMenuId === s.id ? null : s.id)}>•••</button>
+          <button className="more icon-btn" aria-label={`Actions for ${s.name}`} title={`Actions for ${s.name}`} onClick={() => setOpenMenuId(openMenuId === s.id ? null : s.id)}><MoreHorizontal /></button>
           {openMenuId === s.id && <>
             <div className="row-menu-scrim" onClick={() => setOpenMenuId(null)} />
             <div className="row-menu-dropdown">
               <button onClick={() => { setSubjectModal({ mode: "edit", subject: s }); setOpenMenuId(null); }}>Edit</button>
-              <button onClick={() => deleteSubject(s)}>Delete</button>
+              <button className="danger-action" onClick={() => deleteSubject(s)}>Delete</button>
             </div>
           </>}
         </div>
       </div>)}
     </div>}
     {subjectModal && <SubjectModal mode={subjectModal.mode} initial={subjectModal.mode === "edit" ? subjectModal.subject : undefined} close={() => setSubjectModal(null)} onSave={saveSubject} />}
-  </TableShell>;
+  </TableShell>
+  </div>;
 }

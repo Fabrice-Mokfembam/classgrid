@@ -7,6 +7,7 @@ import { useSchool } from "@/lib/school-context";
 import { DEFAULT_LOGO_URL } from "@/lib/branding";
 import type { PeriodSlot, TimetableEntry, WorkingDay } from "@/lib/types";
 import { ErrorState, GridSkeleton, Skel } from "@/components/shared";
+import type { CellHookData } from "jspdf-autotable";
 
 type ValidationIssue = {
   id: string;
@@ -413,24 +414,182 @@ export function Timetable() {
   }
 
   async function downloadPdf() {
+    if (!timetableInfo) return;
     const [{ jsPDF: JsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-    const subtitle = view === "master" ? "Master timetable — all classes" : view === "teacher" ? `Teacher timetable — ${teacherOptions.find(t => t.id === teacherId)?.name ?? ""}` : `Class timetable — ${classOptions.find(c => c.id === classSectionId)?.name ?? ""}`;
+    const selectedName = view === "teacher"
+      ? teacherOptions.find(teacher => teacher.id === teacherId)?.name ?? "Teacher"
+      : classOptions.find(classSection => classSection.id === classSectionId)?.name ?? "Class";
+    const timetableTitle = view === "master" ? "Master timetable" : view === "teacher" ? "Teacher timetable" : "Class timetable";
+    const timetableScope = view === "master" ? "All classes" : selectedName;
+    const statusLabel = timetableInfo.status === "published" ? "Published" : "Draft";
+    const exportedAt = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
     const doc = new JsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-    const logo = await logoPngDataUrl();
-    if (logo) doc.addImage(logo, "PNG", 40, 24, 34, 34);
-    const textX = logo ? 86 : 40;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text(schoolName ?? "Timetable", textX, 40);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(100);
-    doc.text(`${subtitle}${academicYearName ? ` · ${academicYearName}` : ""}`, textX, 58);
-    autoTable(doc, {
-      startY: 74,
-      head: [["Period", ...workingDays.map(d => d.name)]],
-      body: periodSlots.map(p => [`${p.name}\n${p.startTime.slice(0, 5)}–${p.endTime.slice(0, 5)}`, ...workingDays.map(d => (cells.get(`${d.id}-${p.id}`) ?? []).map(e => `${e.subjectName} · ${view === "teacher" ? e.className : e.teacherName}`).join("\n"))]),
-      styles: { fontSize: 8, cellPadding: 5, valign: "middle" },
-      headStyles: { fillColor: [21, 86, 216] },
-      columnStyles: { 0: { fontStyle: "bold" } },
+    doc.setProperties({
+      title: `${schoolName ?? "School"} - ${timetableTitle} - ${timetableScope}`,
+      subject: `${academicYearName ?? "Academic year"} timetable`,
+      author: schoolName ?? "ClassGrid",
+      creator: "ClassGrid",
     });
-    const fileSafe = `${schoolName ?? "timetable"}-${view}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 34;
+    const brandBlue: [number, number, number] = [24, 86, 211];
+    const ink: [number, number, number] = [15, 30, 55];
+    const muted: [number, number, number] = [96, 112, 139];
+    const rule: [number, number, number] = [218, 225, 236];
+    const logo = await logoPngDataUrl();
+
+    doc.setFillColor(...brandBlue);
+    doc.rect(0, 0, pageWidth, 5, "F");
+    if (logo) doc.addImage(logo, "PNG", marginX, 20, 42, 42);
+    const textX = logo ? marginX + 54 : marginX;
+    doc.setTextColor(...ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(schoolName ?? "School timetable", textX, 36);
+    doc.setFontSize(11);
+    doc.text(`${timetableTitle} - ${timetableScope}`, textX, 54);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text(academicYearName ? `Academic year ${academicYearName}` : "Academic timetable", textX, 68);
+
+    const badgeWidth = timetableInfo.status === "published" ? 72 : 48;
+    const badgeX = pageWidth - marginX - badgeWidth;
+    const statusFill: [number, number, number] = timetableInfo.status === "published" ? [229, 247, 239] : [255, 244, 224];
+    const statusText: [number, number, number] = timetableInfo.status === "published" ? [12, 128, 86] : [167, 91, 18];
+    doc.setFillColor(...statusFill);
+    doc.roundedRect(badgeX, 24, badgeWidth, 24, 5, 5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...statusText);
+    doc.text(statusLabel.toUpperCase(), badgeX + badgeWidth / 2, 39.5, { align: "center" });
+
+    const metaY = 83;
+    const metaHeight = 35;
+    const metaItems = [
+      { label: "VERSION", value: `${timetableInfo.version}` },
+      { label: "QUALITY", value: timetableInfo.qualityScore == null ? "Not scored" : `${timetableInfo.qualityScore}/100` },
+      { label: "LESSONS", value: `${entries.length} scheduled` },
+      { label: "EXPORTED", value: exportedAt },
+    ];
+    const metaWidth = (pageWidth - marginX * 2) / metaItems.length;
+    doc.setFillColor(247, 249, 252);
+    doc.setDrawColor(...rule);
+    doc.roundedRect(marginX, metaY, pageWidth - marginX * 2, metaHeight, 5, 5, "FD");
+    metaItems.forEach((item, index) => {
+      const x = marginX + metaWidth * index;
+      if (index > 0) doc.line(x, metaY + 7, x, metaY + metaHeight - 7);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...muted);
+      doc.text(item.label, x + 11, metaY + 13);
+      doc.setFontSize(9);
+      doc.setTextColor(...ink);
+      doc.text(item.value, x + 11, metaY + 27);
+    });
+
+    const cellLessons = new Map<string, TimetableEntry[]>();
+    const tableBody = periodSlots.map((period, rowIndex) => [
+      `${period.name}\n${period.startTime.slice(0, 5)} - ${period.endTime.slice(0, 5)}`,
+      ...workingDays.map((day, dayIndex) => {
+        const lessons = cells.get(`${day.id}-${period.id}`) ?? [];
+        cellLessons.set(`${rowIndex}-${dayIndex + 1}`, lessons);
+        return lessons.map(lesson => {
+          if (view === "master") return `${lesson.className} - ${lesson.subjectName}\n${lesson.teacherName}`;
+          return `${lesson.subjectName}\n${view === "teacher" ? lesson.className : lesson.teacherName}`;
+        }).join("\n");
+      }),
+    ]);
+    const tableFontSize = view === "master" ? 6.5 : workingDays.length > 5 ? 7 : 7.5;
+
+    autoTable(doc, {
+      startY: 130,
+      margin: { top: 46, right: marginX, bottom: 38, left: marginX },
+      head: [["Period", ...workingDays.map(d => d.name)]],
+      body: tableBody,
+      theme: "grid",
+      styles: {
+        font: "helvetica",
+        fontSize: tableFontSize,
+        cellPadding: { top: 5, right: 6, bottom: 5, left: 9 },
+        valign: "middle",
+        textColor: ink,
+        lineColor: rule,
+        lineWidth: 0.45,
+        overflow: "linebreak",
+        minCellHeight: view === "master" ? 28 : 34,
+      },
+      headStyles: {
+        fillColor: brandBlue,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        halign: "center",
+        fontSize: 8,
+        cellPadding: 7,
+      },
+      bodyStyles: { fillColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [250, 251, 253] },
+      columnStyles: {
+        0: {
+          fontStyle: "bold",
+          fillColor: [244, 247, 251],
+          textColor: ink,
+          halign: "left",
+          cellWidth: 76,
+          cellPadding: { top: 5, right: 5, bottom: 5, left: 7 },
+        },
+      },
+      didParseCell: (data: CellHookData) => {
+        if (data.section !== "body" || data.column.index === 0) return;
+        const lessons = cellLessons.get(`${data.row.index}-${data.column.index}`) ?? [];
+        if (lessons.length === 0) {
+          data.cell.styles.fillColor = [252, 253, 254];
+          data.cell.styles.textColor = [160, 170, 185];
+        }
+      },
+      didDrawCell: (data: CellHookData) => {
+        if (data.section !== "body" || data.column.index === 0) return;
+        const lessons = cellLessons.get(`${data.row.index}-${data.column.index}`) ?? [];
+        if (lessons.length === 0) return;
+        const stripeHeight = Math.max(4, (data.cell.height - 8) / lessons.length);
+        lessons.forEach((lesson, index) => {
+          const color = /^#[0-9a-f]{6}$/i.test(lesson.subjectColor) ? lesson.subjectColor : "#1f63db";
+          doc.setFillColor(color);
+          doc.roundedRect(data.cell.x + 2.2, data.cell.y + 4 + stripeHeight * index, 2.8, Math.max(3, stripeHeight - 1.5), 1, 1, "F");
+        });
+      },
+    });
+
+    const totalPages = doc.getNumberOfPages();
+    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+      doc.setPage(pageNumber);
+      if (pageNumber > 1) {
+        doc.setFillColor(...brandBlue);
+        doc.rect(0, 0, pageWidth, 4, "F");
+        doc.setTextColor(...ink);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(schoolName ?? "School timetable", marginX, 25);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...muted);
+        doc.text(`${timetableTitle} - ${timetableScope}`, pageWidth - marginX, 25, { align: "right" });
+        doc.setDrawColor(...rule);
+        doc.line(marginX, 34, pageWidth - marginX, 34);
+      }
+      doc.setDrawColor(...rule);
+      doc.line(marginX, pageHeight - 28, pageWidth - marginX, pageHeight - 28);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...muted);
+      doc.text(`${schoolName ?? "School"} | Generated by ClassGrid`, marginX, pageHeight - 15);
+      doc.text(`Version ${timetableInfo.version} | ${statusLabel}`, pageWidth / 2, pageHeight - 15, { align: "center" });
+      doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - marginX, pageHeight - 15, { align: "right" });
+    }
+
+    const scopeSafe = view === "master" ? "master" : selectedName;
+    const fileSafe = `${schoolName ?? "timetable"}-${scopeSafe}-timetable`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     doc.save(`${fileSafe}.pdf`);
   }
 
@@ -453,32 +612,33 @@ export function Timetable() {
         </div>
       </div>
       <div className="tt-toolbar">
-        <div className="segmented">
-          <button className={view === "class" ? "active" : ""} onClick={() => setView("class")}>Class</button>
-          <button className={view === "teacher" ? "active" : ""} onClick={() => setView("teacher")}>Teacher</button>
-          <button className={view === "master" ? "active" : ""} onClick={() => setView("master")}>Master</button>
-        </div>
-        {view === "class" && <select value={classSectionId} onChange={e => setClassSectionId(e.target.value)}>{classOptions.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select>}
-        {view === "class" && <button className="btn" onClick={openClassCoverage}><ChartNoAxesColumn /> Class coverage</button>}
-        {view === "class" && <button className="btn" onClick={repairClass} disabled={repairingClass || regenerating}><Sparkles /> {repairingClass ? "Repairing…" : "Repair class"}</button>}
-        {view === "teacher" && <select value={teacherId} onChange={e => setTeacherId(e.target.value)}>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select>}
-        <button className="btn" onClick={validateTimetable} disabled={validating}><ShieldCheck /> {validating ? "Validating…" : "Validate"}</button>
-        <button className="btn" onClick={regenerateUnlocked} disabled={regenerating || repairingClass}><RefreshCw /> {regenerating ? "Regenerating…" : "Regenerate unlocked"}</button>
-        {selected && <button className="btn" onClick={toggleLock} title={selected.isLocked ? "Locked — click to unlock." : "Unlocked — click to lock."}>
-          {selected.isLocked ? <LockKeyhole /> : <UnlockKeyhole />} {selected.isLocked ? "Unlock lesson" : "Lock lesson"}
-        </button>}
-        {selected && <label className="lesson-teacher-control" title="Change the teacher for this lesson only">
-          <UserRound />
-          <select aria-label={`Teacher for this ${selected.subjectName} period`} value={selected.teacherId} disabled={changingTeacher} onChange={event => changeSelectedTeacher(event.target.value)}>
-            {!teacherOptions.some(teacher => teacher.id === selected.teacherId) && <option value={selected.teacherId}>{selected.teacherName}</option>}
-            {teacherOptions.map(teacher => <option value={teacher.id} key={teacher.id}>{teacher.name}</option>)}
-          </select>
-        </label>}
-        <div className="tt-toolbar-actions">
-          <button className="btn" onClick={downloadPdf}><Download /> Download</button>
-          <button className="btn primary" onClick={publishTimetable} disabled={publishing || timetableInfo.status === "published"}>{publishing ? "Publishing…" : timetableInfo.status === "published" ? "Published" : "Publish timetable"}</button>
+        <div className="tt-toolbar-main">
+          <div className="tt-view-controls">
+            <div className="segmented">
+              <button className={view === "class" ? "active" : ""} onClick={() => setView("class")}>Class</button>
+              <button className={view === "teacher" ? "active" : ""} onClick={() => setView("teacher")}>Teacher</button>
+              <button className={view === "master" ? "active" : ""} onClick={() => setView("master")}>Master</button>
+            </div>
+            {view === "class" && <select aria-label="Class timetable" value={classSectionId} onChange={e => setClassSectionId(e.target.value)}>{classOptions.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select>}
+            {view === "teacher" && <select aria-label="Teacher timetable" value={teacherId} onChange={e => setTeacherId(e.target.value)}>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select>}
+          </div>
+          <div className="tt-tool-groups">
+            <div className="tt-action-cluster" aria-label="Review timetable">
+              {view === "class" && <button type="button" onClick={openClassCoverage} title="Review class coverage"><ChartNoAxesColumn /><span>Coverage</span></button>}
+              <button type="button" onClick={validateTimetable} disabled={validating} title="Validate timetable"><ShieldCheck /><span>{validating ? "Validating…" : "Validate"}</span></button>
+            </div>
+            <div className="tt-action-cluster" aria-label="Improve timetable">
+              {view === "class" && <button type="button" onClick={repairClass} disabled={repairingClass || regenerating} title="Repair the selected class timetable"><Sparkles /><span>{repairingClass ? "Repairing…" : "Repair class"}</span></button>}
+              <button type="button" onClick={regenerateUnlocked} disabled={regenerating || repairingClass} title="Regenerate all unlocked lessons"><RefreshCw /><span>{regenerating ? "Regenerating…" : "Regenerate"}</span></button>
+            </div>
+          </div>
+          <div className="tt-toolbar-actions">
+            <button className="btn tt-download-btn" onClick={downloadPdf} aria-label="Download timetable PDF" title="Download timetable PDF"><Download /></button>
+            <button className="btn primary" onClick={publishTimetable} disabled={publishing || timetableInfo.status === "published"}>{publishing ? "Publishing…" : timetableInfo.status === "published" ? "Published" : "Publish timetable"}</button>
+          </div>
         </div>
       </div>
+      {selected && <div className="tt-selection-bar"><div className="tt-selection-summary"><i style={{ background: selected.subjectColor }} /><span><b>{selected.subjectName}</b><small>{view === "teacher" ? selected.className : selected.teacherName}</small></span></div><span className="tt-selection-label">Selected lesson</span><button className="btn" onClick={toggleLock} title={selected.isLocked ? "Unlock this lesson" : "Lock this lesson"}>{selected.isLocked ? <LockKeyhole /> : <UnlockKeyhole />} {selected.isLocked ? "Unlock" : "Lock"}</button><label className="lesson-teacher-control" title="Change the teacher for this lesson only"><UserRound /><select aria-label={`Teacher for this ${selected.subjectName} period`} value={selected.teacherId} disabled={changingTeacher} onChange={event => changeSelectedTeacher(event.target.value)}>{!teacherOptions.some(teacher => teacher.id === selected.teacherId) && <option value={selected.teacherId}>{selected.teacherName}</option>}{teacherOptions.map(teacher => <option value={teacher.id} key={teacher.id}>{teacher.name}</option>)}</select></label><button type="button" className="icon-btn" aria-label="Clear lesson selection" title="Clear lesson selection" onClick={() => setSelected(null)}><X /></button></div>}
       <div className="score-row">
         <span><b>{timetableInfo.qualityScore ?? "—"}</b>/100 Quality</span>
         <span><CalendarDays /> <b>{entries.length}</b> lessons scheduled</span>

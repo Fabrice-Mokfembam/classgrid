@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, Clock3,
-  FileCheck2, Grip, GripVertical, Layers, LockKeyhole, Menu, School2, ShieldCheck,
+  FileCheck2, GripVertical, Layers, LockKeyhole, Menu, School2, ShieldCheck,
   Sparkles, UsersRound, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMySchoolSlug } from "@/lib/school-context";
-import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
+import { APP_NAME, DEFAULT_LOGO_URL, WORDMARK_LOGO_URL } from "@/lib/branding";
+import { HeroPreviewMotion, HeroReveal, MotionCard, Reveal } from "@/components/landing-motion";
+
+const LANDING_LOGO_URL = WORDMARK_LOGO_URL;
+const LANDING_MARK_URL = DEFAULT_LOGO_URL;
 
 const CAPABILITIES = [
   { icon: Clock3, title: "Academic schedule", text: "Define teaching days, lesson periods and breaks once — every other screen builds on it." },
@@ -49,6 +53,37 @@ const FAQS = [
   { q: "Is our school's data visible to other schools on the platform?", a: "No. Every record is scoped to your school and enforced with row-level security at the database layer, not just hidden in the interface." },
 ];
 
+const HERO_SCHEDULE = [
+  [
+    { subject: "Mathematics", teacher: "A. Ngwa", tone: "blue" },
+    { subject: "English", teacher: "T. Ashu", tone: "purple" },
+    { subject: "Physics", teacher: "D. Lum", tone: "green" },
+    { subject: "Computer Science", teacher: "P. Bih", tone: "coral" },
+    { subject: "History", teacher: "M. Yong", tone: "violet" },
+  ],
+  [
+    { subject: "Biology", teacher: "C. Bih", tone: "green" },
+    { subject: "Mathematics", teacher: "A. Ngwa", tone: "blue" },
+    { subject: "French", teacher: "G. Nde", tone: "coral" },
+    { subject: "English", teacher: "T. Ashu", tone: "purple" },
+    { subject: "Chemistry", teacher: "D. Lum", tone: "green" },
+  ],
+  [
+    { subject: "Geography", teacher: "M. Yong", tone: "violet" },
+    { subject: "Physics", teacher: "D. Lum", tone: "green" },
+    { subject: "Mathematics", teacher: "A. Ngwa", tone: "blue" },
+    { subject: "Commerce", teacher: "P. Bih", tone: "coral" },
+    { subject: "English", teacher: "T. Ashu", tone: "purple" },
+  ],
+  [
+    { subject: "English", teacher: "T. Ashu", tone: "purple" },
+    { subject: "Computer Science", teacher: "P. Bih", tone: "coral" },
+    { subject: "History", teacher: "M. Yong", tone: "violet" },
+    { subject: "Mathematics", teacher: "A. Ngwa", tone: "blue" },
+    { subject: "Biology", teacher: "C. Bih", tone: "green" },
+  ],
+];
+
 export default function Home() {
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
@@ -72,160 +107,180 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [router]);
 
-  if (checkingSession) return <div className="app-loading"><img className="app-loading-logo" src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></div>;
+  if (checkingSession) return <div className="app-loading"><img className="app-loading-logo" src={LANDING_MARK_URL} alt={`${APP_NAME} logo`} /></div>;
 
   return (
     <main className="landing">
       <nav className="landing-nav">
-        <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
-        <div className="nav-links">
-          <a href="/guide">Guide</a>
-          <a href="#capabilities">Capabilities</a>
-          <a href="#how">How it works</a>
-          <a href="#faq">FAQ</a>
+        <div className="landing-nav-inner">
+          <div className="landing-brand"><img src={LANDING_LOGO_URL} alt={`${APP_NAME} logo`} /></div>
+          <div className="nav-links">
+            <a href="#how">How it works</a>
+            <a href="#capabilities">Product</a>
+            <a href="/guide">Setup guide</a>
+            <a href="#faq">Questions</a>
+          </div>
+          <div className="nav-actions">
+            <button className="btn ghost" onClick={() => goToAuth("signin")}>Sign in</button>
+            <button className="btn primary" onClick={() => goToAuth()}>Create workspace <ArrowRight size={16} /></button>
+          </div>
+          <button className="nav-toggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen(v => !v)}>
+            {navOpen ? <X /> : <Menu />}
+          </button>
         </div>
-        <div className="nav-actions">
-          <button className="btn ghost" onClick={() => goToAuth("signin")}>Sign in</button>
-          <button className="btn primary" onClick={() => goToAuth()}>Create school account <ArrowRight size={16} /></button>
-        </div>
-        <button className="nav-toggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen(v => !v)}>
-          {navOpen ? <X /> : <Menu />}
-        </button>
       </nav>
       {navOpen && (
         <div className="nav-mobile">
-          <a href="/guide" onClick={() => setNavOpen(false)}>Guide</a>
-          <a href="#capabilities" onClick={() => setNavOpen(false)}>Capabilities</a>
           <a href="#how" onClick={() => setNavOpen(false)}>How it works</a>
-          <a href="#faq" onClick={() => setNavOpen(false)}>FAQ</a>
+          <a href="#capabilities" onClick={() => setNavOpen(false)}>Product</a>
+          <a href="/guide" onClick={() => setNavOpen(false)}>Setup guide</a>
+          <a href="#faq" onClick={() => setNavOpen(false)}>Questions</a>
           <hr />
           <button className="btn ghost" onClick={() => goToAuth("signin")}>Sign in</button>
-          <button className="btn primary" onClick={() => goToAuth()}>Create school account <ArrowRight size={16} /></button>
+          <button className="btn primary" onClick={() => goToAuth()}>Create workspace <ArrowRight size={16} /></button>
         </div>
       )}
 
       <section className="hero">
-        <div className="hero-copy">
-          <div className="eyebrow"><Sparkles size={15} /> Timetables without the weekly struggle</div>
-          <h1>Build a conflict-free school timetable in minutes.</h1>
-          <p>Configure your school, add teacher availability and teaching loads, then generate, adjust and publish every class timetable from one place.</p>
-          <div className="hero-actions">
-            <button className="btn primary large" onClick={() => goToAuth()}>Start your school setup <ArrowRight size={18} /></button>
-            <span>No credit card required</span>
+        <div className="hero-intro">
+          <div className="hero-copy">
+            <HeroReveal className="hero-tags">
+              <span>Now built for</span>
+              <b>Class views</b>
+              <b>Teacher views</b>
+              <b>PDF exports</b>
+            </HeroReveal>
+            <HeroReveal delay={0.08} className="hero-title-wrap">
+              <span className="hero-label"><i /> Timetable platform for schools</span>
+              <h1>Build school timetables as clearly as a class register.</h1>
+            </HeroReveal>
+            <HeroReveal delay={0.18} className="hero-lede">ClassGrid brings teacher availability, teaching loads and every class timetable into one dependable workspace.</HeroReveal>
+            <HeroReveal delay={0.28} className="hero-decision">
+              <button className="btn primary large" onClick={() => goToAuth()}>Create your school workspace <ArrowRight size={18} /></button>
+              <button className="btn hero-secondary" onClick={() => goToAuth("signin")}>Sign in</button>
+              <small><LockKeyhole /> No credit card. Your school data stays private.</small>
+            </HeroReveal>
           </div>
-          <div className="trust-row">
-            <span><CheckCircle2 /> Multi-school data isolation</span>
-            <span><CheckCircle2 /> Manual drag-and-drop corrections</span>
-          </div>
-        </div>
-        <div className="hero-product">
-          <div className="product-top"><span className="mini-logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /> Excellence Bilingual Academy</span><span className="status-pill success">Ready to publish</span></div>
-          <div className="mini-stats"><div><b>24</b><span>Teachers</span></div><div><b>12</b><span>Classes</span></div><div><b>186</b><span>Lessons</span></div></div>
-          <div className="mini-grid">
-            <div className="mini-head"></div>
-            {["Mon", "Tue", "Wed", "Thu", "Fri"].map(x => <div className="mini-head" key={x}>{x}</div>)}
-            {[1, 2, 3, 4].flatMap(p => [
-              <div className="mini-period" key={`p${p}`}>P{p}</div>,
-              ...["math", "english", "science", "french", "tech"].map((c, i) => (
-                <div className={`mini-lesson ${c}`} key={`${p}-${i}`}><span>{["Mathematics", "English", "Physics", "French", "Computer"][i]}</span><LockKeyhole size={10} /></div>
-              )),
-            ])}
-          </div>
-          <div className="drag-hint"><Grip /> Drag to adjust <span>0 hard conflicts</span></div>
+          <HeroPreviewMotion className="hero-visual">
+            <div className="hero-product" aria-label="ClassGrid timetable editor preview">
+              <div className="browser-dots"><i /><i /><i /></div>
+              <div className="product-top">
+                <span className="mini-logo"><img src={LANDING_MARK_URL} alt="" /><span><b>Excellence Bilingual Academy</b><small>2026 / 2027 - Term 1</small></span></span>
+                <span className="status-pill success"><CheckCircle2 /> Validated</span>
+              </div>
+              <div className="product-toolbar">
+                <div className="product-view-tabs"><b>Class</b><span>Teacher</span><span>Master</span></div>
+                <strong>Form 5</strong>
+                <span className="product-validate"><ShieldCheck /> Ready</span>
+              </div>
+              <div className="mini-grid">
+                <div className="mini-head">Period</div>
+                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map(day => <div className="mini-head" key={day}>{day}</div>)}
+                {HERO_SCHEDULE.flatMap((row, rowIndex) => [
+                  <div className="mini-period" key={`p${rowIndex}`}><b>Period {rowIndex + 1}</b><small>{["07:45 - 08:30", "08:30 - 09:15", "09:35 - 10:20", "10:20 - 11:05"][rowIndex]}</small></div>,
+                  ...row.map((lesson, columnIndex) => (
+                    <div className={`mini-lesson ${lesson.tone}`} key={`${rowIndex}-${columnIndex}`}><span><b>{lesson.subject}</b><small>{lesson.teacher}</small></span>{rowIndex === 0 && columnIndex === 0 ? <LockKeyhole /> : null}</div>
+                  )),
+                ])}
+              </div>
+              <div className="product-summary"><span><CheckCircle2 /> 164 lessons scheduled</span><span><ShieldCheck /> 0 clashes</span><small>Draft v8</small></div>
+            </div>
+            <p>Every class, teacher, and master copy stays connected to the same timetable.</p>
+          </HeroPreviewMotion>
         </div>
       </section>
 
       <section className="compare section alt-bg">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="kicker">The problem</span>
           <h2>Timetabling shouldn't take a week every term.</h2>
           <p>Most schools still build their timetable by hand, then spend the first few weeks of term fixing the clashes nobody caught.</p>
-        </div>
+        </Reveal>
         <div className="compare-grid">
-          <div className="compare-card without">
+          <MotionCard className="compare-card without">
             <h3>Without ClassGrid</h3>
             <ul>{WITHOUT.map(t => <li key={t}><X /> {t}</li>)}</ul>
-          </div>
-          <div className="compare-card with">
+          </MotionCard>
+          <MotionCard className="compare-card with">
             <h3>With ClassGrid</h3>
             <ul>{WITH.map(t => <li key={t}><CheckCircle2 /> {t}</li>)}</ul>
-          </div>
+          </MotionCard>
         </div>
       </section>
 
       <section className="how section" id="how">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="kicker">How it works</span>
           <h2>From a blank workspace to a published timetable.</h2>
-        </div>
+        </Reveal>
         <div className="steps">
           {STEPS.map(s => (
-            <div className="step-card" key={s.n}>
+            <Reveal className="step-card" key={s.n} delay={Number(s.n) * 0.04}>
               <span>{s.n}</span>
               <h3>{s.title}</h3>
               <p>{s.text}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       <section className="capabilities section alt-bg" id="capabilities">
-        <div className="section-head">
+        <Reveal className="section-head">
           <span className="kicker">Capabilities</span>
           <h2>Everything the timetable office actually needs.</h2>
-        </div>
+        </Reveal>
         <div className="cap-grid">
           {CAPABILITIES.map(c => (
-            <div className="cap-card" key={c.title}>
+            <MotionCard className="cap-card" key={c.title}>
               <span><c.icon /></span>
               <b>{c.title}</b>
               <p>{c.text}</p>
-            </div>
+            </MotionCard>
           ))}
         </div>
       </section>
 
       <section className="guarantee">
         <div className="section guarantee-layout">
-          <div className="guarantee-copy">
+          <Reveal className="guarantee-copy" direction="left">
             <span className="kicker">Guaranteed, not just checked</span>
             <h2>Four rules every generated timetable follows.</h2>
             <p>These aren't validation warnings you can dismiss — they're enforced at generation time, and enforced again at the database level.</p>
-          </div>
+          </Reveal>
           <div className="guarantee-grid">
-            <div><LockKeyhole /><div><b>No teacher clashes</b><small>A teacher is only ever in one class at a time.</small></div></div>
-            <div><LockKeyhole /><div><b>No class clashes</b><small>A class receives one lesson per period, no exceptions.</small></div></div>
-            <div><ShieldCheck /><div><b>Availability respected</b><small>Unavailable slots are never used when generating.</small></div></div>
-            <div><Sparkles /><div><b>Balanced distribution</b><small>Lessons are spread through the week instead of stacked.</small></div></div>
+            <Reveal delay={0.03}><LockKeyhole /><div><b>No teacher clashes</b><small>A teacher is only ever in one class at a time.</small></div></Reveal>
+            <Reveal delay={0.08}><LockKeyhole /><div><b>No class clashes</b><small>A class receives one lesson per period, no exceptions.</small></div></Reveal>
+            <Reveal delay={0.13}><ShieldCheck /><div><b>Availability respected</b><small>Unavailable slots are never used when generating.</small></div></Reveal>
+            <Reveal delay={0.18}><Sparkles /><div><b>Balanced distribution</b><small>Lessons are spread through the week instead of stacked.</small></div></Reveal>
           </div>
         </div>
       </section>
 
       <section className="faq section" id="faq">
-        <div className="section-head center">
+        <Reveal className="section-head center">
           <span className="kicker">FAQ</span>
           <h2>Questions administrators ask first.</h2>
-        </div>
-        <div className="faq-list">
+        </Reveal>
+        <Reveal className="faq-list">
           {FAQS.map(f => (
             <details key={f.q}>
               <summary>{f.q}<ChevronDown /></summary>
               <p>{f.a}</p>
             </details>
           ))}
-        </div>
+        </Reveal>
       </section>
 
-      <section className="cta-banner">
+      <Reveal className="cta-banner">
         <h2>Stop rebuilding your timetable by hand.</h2>
         <p>Set up your school and see a generated timetable the same day.</p>
         <button className="btn primary large" onClick={() => goToAuth()}>Start your school setup <ArrowRight size={18} /></button>
-      </section>
+      </Reveal>
 
       <footer className="site-footer">
-        <div className="footer-top">
+        <Reveal className="footer-top">
           <div className="footer-brand">
-            <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
+            <div className="landing-brand footer-logo"><img src={LANDING_LOGO_URL} alt={`${APP_NAME} logo`} /></div>
             <p>Conflict-free school timetabling for multi-school administrators.</p>
           </div>
           <div className="footer-cols">
@@ -233,7 +288,7 @@ export default function Home() {
             <div><b>Company</b><a href="#">About</a><a href="#">Contact</a></div>
             <div><b>Legal</b><a href="#">Privacy</a><a href="#">Terms</a></div>
           </div>
-        </div>
+        </Reveal>
         <div className="footer-bottom">
           <span>© 2026 {APP_NAME}.</span>
           <span>Built for the people who actually build the timetable.</span>

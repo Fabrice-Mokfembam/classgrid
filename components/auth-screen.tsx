@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Mail, School2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Eye, EyeOff, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMySchoolSlug } from "@/lib/school-context";
@@ -17,6 +17,7 @@ const initial: SchoolProfile = {
 
 const STEP_LABELS = ["Account", "School profile", "Academic setup", "Review"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const REMEMBERED_EMAIL_KEY = "classgrid:remembered-email";
 
 function validateStep(step: number, profile: SchoolProfile, password: string, confirmPassword: string) {
   const e: Record<string, string> = {};
@@ -75,6 +76,21 @@ function Field({ label, required, error, hint, wide, children }: { label: string
   );
 }
 
+function AuthBrandPanel({ variant }: { variant: "signin" | "signup" }) {
+  const signingIn = variant === "signin";
+  return (
+    <div className="auth-brand">
+      <div className="brand light"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
+      <div>
+        <span className="auth-kicker">{signingIn ? "WELCOME BACK" : "START YOUR WORKSPACE"}</span>
+        <h1>{signingIn ? "Your whole school week, under control." : "Build a timetable your school can trust."}</h1>
+        <p>{signingIn ? "Sign in to continue configuring, generating and publishing your timetables." : "Create your school workspace, add the academic basics, then let ClassGrid guide you through the rest."}</p>
+      </div>
+      <small>{signingIn ? "Conflict-free by design." : "Setup takes only a few minutes."}</small>
+    </div>
+  );
+}
+
 export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => void; initialMode?: "signin" | "signup" }) {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">(initialMode);
@@ -88,15 +104,32 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [signinEmail, setSigninEmail] = useState("");
   const [signinPassword, setSigninPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [signinError, setSigninError] = useState("");
 
   const update = (k: keyof SchoolProfile, v: string | string[]) => setProfile(p => ({ ...p, [k]: v }));
 
   const goToStep = (n: number) => { setErrors({}); setStep(n); };
 
+  useEffect(() => {
+    const rememberedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+    if (rememberedEmail) {
+      setSigninEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
   const next = async () => {
     const stepErrors = validateStep(step, profile, password, confirmPassword);
-    if (Object.keys(stepErrors).length) { setErrors(stepErrors); return; }
+    if (Object.keys(stepErrors).length) {
+      setErrors(stepErrors);
+      requestAnimationFrame(() => {
+        const firstInvalid = document.querySelector<HTMLElement>(".signup-card .invalid input, .signup-card .invalid select, .signup-card .field-error.inline");
+        firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (firstInvalid instanceof HTMLInputElement || firstInvalid instanceof HTMLSelectElement) firstInvalid.focus();
+      });
+      return;
+    }
     setErrors({});
     if (step < 4) { setStep(step + 1); return; }
 
@@ -126,6 +159,8 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
     setSubmitting(true);
     const { error } = await supabase.auth.signInWithPassword({ email: signinEmail, password: signinPassword });
     if (error) { setSubmitting(false); setSigninError(error.message); return; }
+    if (rememberMe) window.localStorage.setItem(REMEMBERED_EMAIL_KEY, signinEmail);
+    else window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
     const slug = await fetchMySchoolSlug(supabase);
     setSubmitting(false);
     if (!slug) { setSigninError("Couldn't find a school workspace for this account."); return; }
@@ -134,11 +169,7 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
 
   if (mode === "signin") return (
     <div className="auth-layout">
-      <div className="auth-brand">
-        <div className="brand light"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
-        <div><span className="auth-kicker">WELCOME BACK</span><h1>Your whole school week, under control.</h1><p>Sign in to continue configuring, generating and publishing your timetables.</p></div>
-        <small>Conflict-free by design.</small>
-      </div>
+      <AuthBrandPanel variant="signin" />
       <div className="auth-form-wrap">
         <button className="back-link" onClick={onBack}><ArrowLeft /> Back to home</button>
         <form className="auth-form" onSubmit={signIn}>
@@ -147,7 +178,7 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
           <label>Email address<input type="email" value={signinEmail} onChange={e => setSigninEmail(e.target.value)} placeholder="admin@school.com" required /></label>
           <label>Password<div className="password"><input type={show ? "text" : "password"} value={signinPassword} onChange={e => setSigninPassword(e.target.value)} placeholder="••••••••" required /><button type="button" onClick={() => setShow(!show)}>{show ? <EyeOff /> : <Eye />}</button></div></label>
           {signinError && <small className="field-error">{signinError}</small>}
-          <div className="form-row"><label className="check"><input type="checkbox" /> Remember me</label><button type="button" className="text-btn">Forgot password?</button></div>
+          <div className="form-row"><label className="check"><input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} /> Remember my email</label><button type="button" className="text-btn">Forgot password?</button></div>
           <button className="btn primary full" disabled={submitting}>{submitting ? "Signing in…" : <>Sign in <ArrowRight /></>}</button>
           <p className="center">New school? <button type="button" className="text-btn" onClick={() => setMode("signup")}>Create an account</button></p>
         </form>
@@ -171,28 +202,31 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
   );
 
   return (
-    <div className="onboarding">
-      <header>
-        <div className="brand"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</div>
-        <button className="btn ghost" onClick={() => setMode("signin")}>Already registered? Sign in</button>
-      </header>
-      <div className="stepper">
-        {STEP_LABELS.map((x, i) => {
-          const n = i + 1;
-          const done = n < step;
-          return (
-            <div className={["step", n <= step && "active", done && "clickable"].filter(Boolean).join(" ")} key={x} onClick={() => done && goToStep(n)}>
-              <span>{done ? <Check /> : n}</span><b>{x}</b>
-            </div>
-          );
-        })}
-      </div>
-      <p className="step-progress">Step {step} of 4 — {STEP_LABELS[step - 1]}</p>
-      <section className="setup-card">
+    <div className="auth-layout auth-signup-layout">
+      <AuthBrandPanel variant="signup" />
+      <div className="auth-signup-wrap">
+        <div className="auth-signup-nav">
+          <button type="button" className="signup-home-link" onClick={onBack}><ArrowLeft /> Back to home</button>
+          <p>Already registered? <button type="button" className="text-btn" onClick={() => setMode("signin")}>Sign in</button></p>
+        </div>
+        <main className="auth-signup-main">
+          <div className="stepper signup-stepper">
+            {STEP_LABELS.map((x, i) => {
+              const n = i + 1;
+              const done = n < step;
+              return (
+                <div className={["step", n <= step && "active", done && "clickable"].filter(Boolean).join(" ")} key={x} onClick={() => done && goToStep(n)}>
+                  <span>{done ? <Check /> : n}</span><b>{x}</b>
+                </div>
+              );
+            })}
+          </div>
+          <p className="step-progress">Step {step} of 4 - {STEP_LABELS[step - 1]}</p>
+          <section className="setup-card signup-card">
         {step === 1 && <>
-          <div className="setup-icon"><School2 /></div>
           <h1>Create your school workspace</h1>
           <p>Start with the account responsible for managing your school timetable.</p>
+          {Object.keys(errors).length > 0 && <div className="signup-validation" role="alert"><CircleAlert /><span><b>Complete the highlighted fields</b><small>We need these details before moving to the next step.</small></span></div>}
           <div className="form-grid">
             <div className="form-section span-2"><b>Your details</b></div>
             <Field label="Administrator full name" required error={errors.adminName}>
@@ -221,6 +255,7 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
         {step === 2 && <>
           <h1>Tell us about your school</h1>
           <p>This information appears on timetables and keeps your workspace correctly configured.</p>
+          {Object.keys(errors).length > 0 && <div className="signup-validation" role="alert"><CircleAlert /><span><b>Complete the highlighted fields</b><small>We need these details before moving to the next step.</small></span></div>}
           <div className="form-grid">
             <div className="form-section span-2"><b>About your school</b></div>
             <Field label="School display name" required error={errors.name}>
@@ -265,6 +300,7 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
         {step === 3 && <>
           <h1>Set your academic starting point</h1>
           <p>You can adjust all these details later in School Settings.</p>
+          {Object.keys(errors).length > 0 && <div className="signup-validation" role="alert"><CircleAlert /><span><b>Complete the highlighted fields</b><small>We need these details before moving to the next step.</small></span></div>}
           <div className="form-grid">
             <div className="form-section span-2"><b>Calendar &amp; scale</b></div>
             <Field label="Academic year">
@@ -332,10 +368,12 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
           <div className="success-box review-note"><Check /><div><b>Your school's data is isolated</b><p>Only administrators you invite to this workspace can see these records.</p></div></div>
         </>}
         <footer>
-          <button className="btn ghost" onClick={() => { setErrors({}); step === 1 ? onBack() : setStep(step - 1); }}><ArrowLeft /> {step === 1 ? "Cancel" : "Back"}</button>
-          <button className="btn primary" onClick={next} disabled={submitting}>{submitting ? "Creating workspace…" : <>{step === 4 ? "Create school workspace" : "Continue"}<ArrowRight /></>}</button>
+          <button type="button" className="btn ghost" onClick={() => { setErrors({}); step === 1 ? onBack() : setStep(step - 1); }}><ArrowLeft /> {step === 1 ? "Cancel" : "Back"}</button>
+          <button type="button" className="btn primary" onClick={() => void next()} disabled={submitting}>{submitting ? "Creating workspace…" : <>{step === 4 ? "Create school workspace" : "Continue"}<ArrowRight /></>}</button>
         </footer>
-      </section>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

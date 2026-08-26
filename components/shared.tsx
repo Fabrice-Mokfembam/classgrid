@@ -1,6 +1,6 @@
 "use client";
 import { Component, type ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 
 // ─── Skeleton / loading primitives ────────────────────────────────────────────
 
@@ -27,11 +27,15 @@ export function firstError(...results: { error: { message: string } | null }[]) 
   return results.find(r => r.error)?.error?.message ?? null;
 }
 
+export function Explainer({ title, children }: { title: string; children: ReactNode }) {
+  return <aside className="page-explainer"><Info /><div><b>{title}</b><p>{children}</p></div></aside>;
+}
+
 // ─── TableShell ───────────────────────────────────────────────────────────────
 import { Search, Plus } from "lucide-react";
 
-export function TableShell({ children, title, count, button, onAdd, searchValue, onSearchChange, searchPlaceholder = "Search…" }: { children: React.ReactNode; title: string; count: number; button: string; onAdd: () => void; searchValue?: string; onSearchChange?: (value: string) => void; searchPlaceholder?: string }) {
-  return <section className="panel table-panel"><div className="table-tools"><div><h3>{title}</h3><span>{count} records</span></div><div><div className="search"><Search /><input placeholder={searchPlaceholder} value={searchValue ?? ""} onChange={e => onSearchChange?.(e.target.value)} /></div><button className="btn primary" onClick={onAdd}><Plus /> {button}</button></div></div>{children}</section>;
+export function TableShell({ children, title, count, button, onAdd, searchValue, onSearchChange, searchPlaceholder = "Search…", toolbarExtra }: { children: React.ReactNode; title: string; count: number; button: string; onAdd: () => void; searchValue?: string; onSearchChange?: (value: string) => void; searchPlaceholder?: string; toolbarExtra?: React.ReactNode }) {
+  return <section className="panel table-panel"><div className="table-tools"><div><h3>{title}</h3><span>{count} records</span></div><div>{toolbarExtra}<div className="search"><Search /><input aria-label={searchPlaceholder} placeholder={searchPlaceholder} value={searchValue ?? ""} onChange={e => onSearchChange?.(e.target.value)} /></div><button className="btn primary" onClick={onAdd}><Plus /> {button}</button></div></div>{children}</section>;
 }
 
 // ─── ErrorBoundary ────────────────────────────────────────────────────────────

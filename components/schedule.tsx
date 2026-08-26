@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { SchedulePeriod, WorkingDay } from "@/lib/types";
-import { ErrorState, firstError, RowsSkeleton, Skel } from "@/components/shared";
+import { ErrorState, Explainer, firstError, RowsSkeleton, Skel } from "@/components/shared";
 import { X } from "lucide-react";
 
 function PeriodModal({ mode, initial, close, onSave }: { mode: "add" | "edit"; initial?: SchedulePeriod; close: () => void; onSave: (values: { name: string; kind: "lesson" | "break"; startTime: string; endTime: string }) => Promise<void> }) {
@@ -114,7 +114,7 @@ export function Schedule() {
   const activeDaysCount = workingDays.filter(d => d.isActive).length;
   const lessonCount = periodList.filter(p => p.kind === "lesson").length;
 
-  return <div className="settings-layout">
+  return <div className="setup-page-stack"><Explainer title="This schedule becomes the timetable grid">The generator places lessons only inside active teaching days and lesson periods. Breaks divide the day and cannot contain lessons.</Explainer><div className="settings-layout">
     <section className="panel form-panel">
       <div className="section-heading"><div><h3>Weekly structure</h3><p>These slots form the grid used by the generation engine.</p></div></div>
       <div className="field-row">
@@ -148,5 +148,5 @@ export function Schedule() {
       <div className="capacity"><span>Weekly capacity</span><b>{lessonCount * activeDaysCount} lesson slots</b><small>{lessonCount} periods × {activeDaysCount} days</small></div>
     </aside>
     {periodModal && <PeriodModal mode={periodModal.mode} initial={periodModal.mode === "edit" ? periodModal.period : undefined} close={() => setPeriodModal(null)} onSave={savePeriod} />}
-  </div>;
+  </div></div>;
 }

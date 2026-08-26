@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Plus, School2, X } from "lucide-react";
+import { BookOpen, Clock3, Layers3, Plus, Search, School2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { ClassSection, Level, LevelSubjectRow, ParallelGroup, SchoolSubject } from "@/lib/types";
-import { ErrorState, firstError, RowsSkeleton, Skel, TableShell } from "@/components/shared";
+import { ErrorState, Explainer, firstError, RowsSkeleton, Skel, TableShell } from "@/components/shared";
 
 function LevelModal({ mode, initial, close, onSave }: { mode: "add" | "edit"; initial?: Level; close: () => void; onSave: (name: string) => Promise<void> }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -38,6 +38,8 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busySubjectId, setBusySubjectId] = useState<string | null>(null);
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [subjectView, setSubjectView] = useState<"all" | "selected">("all");
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -139,49 +141,57 @@ function LevelSubjectsModal({ level, schoolId, close }: { level: Level; schoolId
     setRows(rs => rs.map(r => ({ ...r, parallelGroupIds: r.parallelGroupIds.filter(id => id !== group.id) })));
   }
 
-  return <div className="modal-backdrop">
-    <div className="modal wide">
-      <div className="modal-head"><div><h2>Subjects for {level.name}</h2><p>Choose which subjects this level teaches, their weekly periods, and any that run in parallel.</p></div><button type="button" className="icon-btn" onClick={close}><X /></button></div>
-      {loadError ? <ErrorState message={loadError} onRetry={load} /> : loading ? <div style={{ padding: "16px 0" }}><Skel w="100%" /><br /><Skel w="100%" /><br /><Skel w="100%" /></div> : <>
-        <fieldset><legend>Subjects taught at this level</legend>
-          {subjectsCatalog.length === 0 ? <small className="field-hint">Add subjects first, then come back here.</small> : <div className="level-subject-list">
-            {subjectsCatalog.map(s => {
-              const row = rows.find(r => r.subjectId === s.id);
-              return <div className="level-subject-row" key={s.id}>
-                <label className="check"><input type="checkbox" checked={!!row} disabled={busySubjectId === s.id} onChange={e => toggleSubject(s.id, e.target.checked)} /><i className="color-dot" style={{ background: s.color }} />{s.name}</label>
-                {row && <>
-                  <input type="number" min={1} value={row.periodsPerWeek} onChange={e => {
-                    const periods = Math.max(1, Number(e.target.value) || 1);
-                    setRows(rs => rs.map(r => r.id === row.id ? { ...r, periodsPerWeek: periods } : r));
-                  }} onBlur={e => updateRow(row, { periods_per_week: Math.max(1, Number(e.target.value) || 1) })} aria-label={`${s.name} periods per week`} />
-                  {groups.length === 0 ? <small className="field-hint">No groups yet</small> : <div className="group-toggle-list">
-                    {groups.map(g => <label className={`group-toggle${row.parallelGroupIds.includes(g.id) ? " on" : ""}`} key={g.id}>
-                      <input type="checkbox" checked={row.parallelGroupIds.includes(g.id)} onChange={e => toggleGroupMembership(row, g.id, e.target.checked)} />
-                      {g.name ?? "Unnamed"}
-                    </label>)}
-                  </div>}
-                </>}
-              </div>;
-            })}
-          </div>}
-        </fieldset>
+  const subjectQuery = subjectSearch.trim().toLowerCase();
+  const filteredCatalog = subjectsCatalog.filter(subject => {
+    const selected = rows.some(row => row.subjectId === subject.id);
+    if (subjectView === "selected" && !selected) return false;
+    return !subjectQuery || [subject.name, subject.code ?? ""].some(value => value.toLowerCase().includes(subjectQuery));
+  });
+  const totalWeeklyPeriods = rows.reduce((sum, row) => sum + row.periodsPerWeek, 0);
 
-        <fieldset>
-          <legend>Parallel groups</legend>
-          <button type="button" className="text-btn" style={{ marginBottom: 8 }} onClick={addGroup}>+ New group</button>
-          {groups.length === 0 ? <small className="field-hint">Subjects sharing a group are allowed to share one slot for this level — e.g. mutually exclusive electives like Commerce/Computer Science.</small> : <div className="parallel-group-list">
-            {groups.map(g => {
-              const members = rows.filter(r => r.parallelGroupIds.includes(g.id)).map(r => subjectsCatalog.find(s => s.id === r.subjectId)?.name ?? "—");
-              return <div className="parallel-group-row" key={g.id}>
-                <input value={g.name ?? ""} onChange={e => setGroups(gs => gs.map(x => x.id === g.id ? { ...x, name: e.target.value } : x))} onBlur={e => renameGroup(g, e.target.value.trim())} placeholder="Unnamed group" aria-label="Group name" />
-                <small>{members.length ? members.join(" / ") : "No subjects assigned yet — pick this group from the dropdown above"}</small>
-                <button type="button" className="icon-btn" onClick={() => deleteGroup(g)} aria-label="Delete group"><X size={14} /></button>
-              </div>;
-            })}
-          </div>}
-        </fieldset>
-      </>}
-      <footer><button type="button" className="btn primary" onClick={close}>Done</button></footer>
+  return <div className="modal-backdrop">
+    <div className="modal level-subject-modal">
+      <div className="modal-head level-subject-modal-head"><div className="level-subject-modal-title"><span><BookOpen /></span><div><h2>Subjects for {level.name}</h2><p>Set the curriculum, weekly periods, and parallel options for this level.</p></div></div><button type="button" className="icon-btn" aria-label="Close subject manager" onClick={close}><X /></button></div>
+      <div className="level-subject-modal-body">
+        {loadError ? <ErrorState message={loadError} onRetry={load} /> : loading ? <div className="level-subject-loading"><Skel w="100%" /><Skel w="100%" /><Skel w="100%" /></div> : <>
+          <section className="level-subject-summary" aria-label="Level subject summary">
+            <div><BookOpen /><span><b>{rows.length}</b><small>Subjects selected</small></span></div>
+            <div><Clock3 /><span><b>{totalWeeklyPeriods}</b><small>Periods per week</small></span></div>
+            <div><Layers3 /><span><b>{groups.length}</b><small>Parallel groups</small></span></div>
+          </section>
+
+          <section className="level-subject-catalogue">
+            <div className="level-subject-toolbar"><div><h3>Level curriculum</h3><p>Choose subjects and set how often each one is taught.</p></div><div className="level-subject-tools"><div className="segmented"><button type="button" className={subjectView === "all" ? "active" : ""} onClick={() => setSubjectView("all")}>All</button><button type="button" className={subjectView === "selected" ? "active" : ""} onClick={() => setSubjectView("selected")}>Selected</button></div><label className="level-subject-search"><Search /><input aria-label="Search level subjects" value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} placeholder="Search subjects" /></label></div></div>
+            {subjectsCatalog.length === 0 ? <div className="level-subject-empty"><BookOpen /><b>No subjects available</b><span>Add subjects to the school catalogue first.</span></div> : filteredCatalog.length === 0 ? <div className="level-subject-empty"><Search /><b>No matching subjects</b><span>Try another search or switch to All.</span></div> : <div className="level-subject-list">
+              <div className="level-subject-row level-subject-row-head"><span>Subject</span><span>Periods/week</span><span>Parallel group</span></div>
+              {filteredCatalog.map(subject => {
+                const row = rows.find(item => item.subjectId === subject.id);
+                return <div className={`level-subject-row${row ? " selected" : ""}`} key={subject.id}>
+                  <label className="level-subject-choice"><input type="checkbox" checked={!!row} disabled={busySubjectId === subject.id} onChange={e => toggleSubject(subject.id, e.target.checked)} /><i className="color-dot" style={{ background: subject.color }} /><span><b>{subject.name}</b>{subject.code && <small>{subject.code}</small>}</span></label>
+                  {row ? <input className="level-period-input" type="number" min={1} value={row.periodsPerWeek} onChange={e => {
+                    const periods = Math.max(1, Number(e.target.value) || 1);
+                    setRows(items => items.map(item => item.id === row.id ? { ...item, periodsPerWeek: periods } : item));
+                  }} onBlur={e => updateRow(row, { periods_per_week: Math.max(1, Number(e.target.value) || 1) })} aria-label={`${subject.name} periods per week`} /> : <span className="level-subject-muted">Not taught</span>}
+                  {row ? groups.length === 0 ? <span className="level-subject-muted">No groups created</span> : <div className="group-toggle-list">
+                    {groups.map(group => <label className={`group-toggle${row.parallelGroupIds.includes(group.id) ? " on" : ""}`} key={group.id}><input type="checkbox" checked={row.parallelGroupIds.includes(group.id)} onChange={e => toggleGroupMembership(row, group.id, e.target.checked)} />{group.name || "Unnamed group"}</label>)}
+                  </div> : <span />}
+                </div>;
+              })}
+            </div>}
+          </section>
+
+          <section className="parallel-group-section">
+            <div className="parallel-group-section-head"><div><h3>Parallel groups</h3><p>Group optional subjects that may share the same timetable period.</p></div><button type="button" className="btn" onClick={addGroup}><Plus /> New group</button></div>
+            {groups.length === 0 ? <div className="parallel-group-empty"><Layers3 /><div><b>No parallel groups</b><span>Create one only when students choose between subjects, such as Commerce or Computer Science.</span></div></div> : <div className="parallel-group-list">
+              {groups.map(group => {
+                const members = rows.filter(row => row.parallelGroupIds.includes(group.id)).map(row => subjectsCatalog.find(subject => subject.id === row.subjectId)?.name ?? "—");
+                return <div className="parallel-group-row" key={group.id}><Layers3 /><input value={group.name ?? ""} onChange={e => setGroups(items => items.map(item => item.id === group.id ? { ...item, name: e.target.value } : item))} onBlur={e => renameGroup(group, e.target.value.trim())} placeholder="Name this group" aria-label="Parallel group name" /><div className="parallel-group-members">{members.length ? members.map(member => <span key={member}>{member}</span>) : <small>No subjects assigned</small>}</div><button type="button" className="icon-btn danger-icon" onClick={() => deleteGroup(group)} aria-label="Delete parallel group"><Trash2 /></button></div>;
+              })}
+            </div>}
+          </section>
+        </>}
+      </div>
+      <footer><span>{rows.length} subject{rows.length === 1 ? "" : "s"} configured for {level.name}</span><button type="button" className="btn primary" onClick={close}>Done</button></footer>
     </div>
   </div>;
 }
@@ -318,6 +328,7 @@ export function Levels() {
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
   return <div className="levels-page">
+    <Explainer title="Levels carry the curriculum; classes receive timetables">Configure subjects and weekly periods on a level first. Every class section inside that level then uses the same curriculum when assignments and timetables are created.</Explainer>
     <section className="panel form-panel">
       <div className="section-heading"><div><h3>Levels</h3><p>Broad groupings like Form 1 — every class section belongs to one.</p></div></div>
       {loading ? <div className="level-chips">{Array.from({ length: 4 }).map((_, i) => <span className="skeleton" key={i} style={{ height: 36, width: 90, borderRadius: 99 }} />)}</div> : <div className="level-chips">

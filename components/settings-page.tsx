@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ImageUp, School2, Trash2 } from "lucide-react";
+import { Building2, ImageUp, Info, Mail, MapPin, Save, School2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
@@ -119,35 +119,46 @@ export function SettingsPage() {
     <div className="form-grid wide">{Array.from({ length: 11 }).map((_, i) => <label key={i}><Skel w="50%" /><br /><Skel w="100%" /></label>)}</div>
   </section>;
 
-  return <section className="panel form-panel">
-    <div className="section-heading">
-      <div><h3>School profile</h3><p>This information is kept inside your school workspace.</p></div>
-      <button className="btn primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
-    </div>
-    <div className="logo-upload">
-      <span>{form.logoUrl ? <img src={form.logoUrl} alt={`${form.name} logo`} /> : <School2 />}</span>
-      <div>
-        <b>School logo</b>
-        <p>PNG, JPG, or WebP, maximum 2 MB</p>
-        <div className="logo-actions">
-          <input ref={fileInputRef} className="file-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={e => { const file = e.target.files?.[0]; if (file) uploadLogo(file); e.currentTarget.value = ""; }} />
-          <button type="button" className="btn" onClick={() => fileInputRef.current?.click()} disabled={uploadingLogo}><ImageUp /> {uploadingLogo ? "Uploading…" : "Upload logo"}</button>
-          {form.logoUrl && <button type="button" className="btn danger" onClick={removeLogo} disabled={uploadingLogo}><Trash2 /> Remove</button>}
+  return <section className="panel settings-profile">
+    <header className="settings-profile-header"><div><span><School2 /></span><div><h3>School profile</h3><p>Manage the official details used across this workspace.</p></div></div></header>
+
+    <div className="settings-profile-body">
+      <div className="settings-note"><Info /><div><b>Where this information appears</b><p>Your display name and logo are shown in the workspace header and on exported timetables. Registered and contact details remain part of the school profile.</p></div></div>
+
+      <section className="settings-section">
+        <div className="settings-section-title"><Building2 /><div><h4>Identity and branding</h4><p>How the school is named and represented throughout ClassGrid.</p></div></div>
+        <div className="settings-logo-card">
+          <span>{form.logoUrl ? <img src={form.logoUrl} alt={`${form.name} logo`} /> : <School2 />}</span>
+          <div><b>School logo</b><p>PNG, JPG, or WebP. Maximum file size: 2 MB.</p><div className="logo-actions"><input ref={fileInputRef} className="file-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={e => { const file = e.target.files?.[0]; if (file) uploadLogo(file); e.currentTarget.value = ""; }} /><button type="button" className="btn" onClick={() => fileInputRef.current?.click()} disabled={uploadingLogo}><ImageUp /> {uploadingLogo ? "Uploading…" : form.logoUrl ? "Replace logo" : "Upload logo"}</button>{form.logoUrl && <button type="button" className="icon-btn settings-remove-logo" aria-label="Remove school logo" title="Remove school logo" onClick={removeLogo} disabled={uploadingLogo}><Trash2 /></button>}</div></div>
         </div>
-      </div>
+        <div className="settings-field-grid">
+          <label>School display name<input required value={form.name} onChange={e => set("name", e.target.value)} placeholder="Name shown in ClassGrid" /></label>
+          <label>Registered name <small>Optional</small><input value={form.legalName} onChange={e => set("legalName", e.target.value)} placeholder="Official registered name" /></label>
+          <label>School type<select value={form.schoolType} onChange={e => set("schoolType", e.target.value)}>{SCHOOL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
+          <label>Curriculum<input value={form.curriculum} onChange={e => set("curriculum", e.target.value)} placeholder="e.g. Cameroon National Curriculum" /></label>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-title"><MapPin /><div><h4>Location and time</h4><p>Used for regional context and timetable dates.</p></div></div>
+        <div className="settings-field-grid location">
+          <label>Country<input value={form.country} onChange={e => set("country", e.target.value)} placeholder="Country" /></label>
+          <label>Region<input value={form.region} onChange={e => set("region", e.target.value)} placeholder="Region or state" /></label>
+          <label>City<input value={form.city} onChange={e => set("city", e.target.value)} placeholder="City" /></label>
+          <label>Timezone<input value={form.timezone} onChange={e => set("timezone", e.target.value)} placeholder="e.g. Africa/Douala" /></label>
+          <label className="settings-span-all">Physical address <small>Optional</small><input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Street or campus address" /></label>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-title"><Mail /><div><h4>Contact details</h4><p>General contact information for the school.</p></div></div>
+        <div className="settings-field-grid">
+          <label>School email <small>Optional</small><input type="email" value={form.email} onChange={e => set("email", e.target.value)} placeholder="school@example.com" /></label>
+          <label>School phone <small>Optional</small><input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="Phone number" /></label>
+        </div>
+      </section>
     </div>
-    <div className="form-grid wide">
-      <label>School display name<input value={form.name} onChange={e => set("name", e.target.value)} /></label>
-      <label>Registered name<input value={form.legalName} onChange={e => set("legalName", e.target.value)} /></label>
-      <label>School type<select value={form.schoolType} onChange={e => set("schoolType", e.target.value)}>{SCHOOL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
-      <label>Curriculum<input value={form.curriculum} onChange={e => set("curriculum", e.target.value)} /></label>
-      <label>Country<input value={form.country} onChange={e => set("country", e.target.value)} /></label>
-      <label>Region<input value={form.region} onChange={e => set("region", e.target.value)} /></label>
-      <label>City<input value={form.city} onChange={e => set("city", e.target.value)} /></label>
-      <label>Timezone<input value={form.timezone} onChange={e => set("timezone", e.target.value)} placeholder="e.g. Africa/Douala" /></label>
-      <label className="span-2">Physical address<input value={form.address} onChange={e => set("address", e.target.value)} /></label>
-      <label>School email<input type="email" value={form.email} onChange={e => set("email", e.target.value)} /></label>
-      <label>School phone<input value={form.phone} onChange={e => set("phone", e.target.value)} /></label>
-    </div>
+
+    <footer className="settings-save-bar"><span>Changes to the school name update the workspace after saving.</span><button className="btn primary" onClick={save} disabled={saving}><Save /> {saving ? "Saving…" : "Save changes"}</button></footer>
   </section>;
 }

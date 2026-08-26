@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font-family: "IBM Plex Sans", Helvetica, Arial, sans-serif; color: #0E1B33; background: #FFFFFF; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+  a { color: #1B4DD8; text-decoration: none; }
+  a:hover { color: #163FB0; text-decoration: underline; }
+  button { font-family: inherit; }
+  h1, h2, h3, p { margin: 0; text-wrap: pretty; }
+</style>
+</helmet>
+<div style="background:#FFFFFF">
+
+  <header style="position:{{ navPosition }};top:0;z-index:50;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);borderBottom:1px solid #E3E7EE">
+    <div style="max-width:1240px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:28px">
+      <a href="#top" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:#0E1B33">
+        <span style="width:26px;height:26px;border-radius:6px;background:#1B4DD8;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;padding:5px">
+          <span style="background:#FFFFFF;border-radius:1px"></span>
+          <span style="background:rgba(255,255,255,0.55);border-radius:1px"></span>
+          <span style="background:rgba(255,255,255,0.55);border-radius:1px"></span>
+          <span style="background:#FFFFFF;border-radius:1px"></span>
+        </span>
+        <span style="font-size:17px;font-weight:600;letter-spacing:-0.01em">ClassGrid</span>
+      </a>
+      <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+        <nav style="display:flex;align-items:center;gap:24px;margin-left:8px">
+          <a href="#how" style="font-size:14px;color:#3A4A63;text-decoration:none">How it works</a>
+          <a href="#product" style="font-size:14px;color:#3A4A63;text-decoration:none">Product</a>
+          <a href="#setup" style="font-size:14px;color:#3A4A63;text-decoration:none">Setup guide</a>
+          <a href="#questions" style="font-size:14px;color:#3A4A63;text-decoration:none">Questions</a>
+        </nav>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:18px">
+          <a href="#signin" style="font-size:14px;color:#3A4A63;text-decoration:none">Sign in</a>
+          <a href="#cta" style="font-size:14px;font-weight:500;color:#FFFFFF;background:#1B4DD8;padding:9px 16px;border-radius:6px;text-decoration:none;border:1px solid #1B4DD8" style-hover="background:#163FB0;border-color:#163FB0;color:#FFFFFF;text-decoration:none">Create workspace</a>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleMenu }}" aria-label="Menu" style="margin-left:auto;display:flex;flex-direction:column;justify-content:center;gap:4px;width:44px;height:44px;padding:0 11px;background:#FFFFFF;border:1px solid #E3E7EE;border-radius:6px;cursor:pointer">
+          <span style="display:block;height:1.5px;background:#0E1B33;border-radius:2px"></span>
+          <span style="display:block;height:1.5px;background:#0E1B33;border-radius:2px"></span>
+          <span style="display:block;height:1.5px;background:#0E1B33;border-radius:2px"></span>
+        </button>
+      </sc-if>
+    </div>
+    <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="borderTop:1px solid #E3E7EE;background:#FFFFFF;padding:8px 24px 20px">
+        <a href="#how" onClick="{{ closeMenu }}" style="display:block;padding:14px 0;font-size:15px;color:#0E1B33;text-decoration:none;borderBottom:1px solid #EEF0F4">How it works</a>
+        <a href="#product" onClick="{{ closeMenu }}" style="display:block;padding:14px 0;font-size:15px;color:#0E1B33;text-decoration:none;borderBottom:1px solid #EEF0F4">Product</a>
+        <a href="#setup" onClick="{{ closeMenu }}" style="display:block;padding:14px 0;font-size:15px;color:#0E1B33;text-decoration:none;borderBottom:1px solid #EEF0F4">Setup guide</a>
+        <a href="#questions" onClick="{{ closeMenu }}" style="display:block;padding:14px 0;font-size:15px;color:#0E1B33;text-decoration:none;borderBottom:1px solid #EEF0F4">Questions</a>
+        <a href="#signin" onClick="{{ closeMenu }}" style="display:block;padding:14px 0;font-size:15px;color:#0E1B33;text-decoration:none">Sign in</a>
+        <a href="#cta" onClick="{{ closeMenu }}" style="display:block;text-align:center;margin-top:12px;padding:14px 16px;font-size:15px;font-weight:500;color:#FFFFFF;background:#1B4DD8;border-radius:6px;text-decoration:none">Create workspace</a>
+      </div>
+    </sc-if>
+  </header>
+
+  <section id="top" data-screen-label="Hero" style="padding:72px 24px 0">
+    <div style="max-width:1240px;margin:0 auto">
+      <div style="max-width:780px">
+        <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid #E3E7EE;background:#F6F7F9;border-radius:6px;padding:5px 10px;font-size:12px;color:#3A4A63;font-weight:500">
+          <span style="width:6px;height:6px;border-radius:50%;background:#0F7A48"></span>
+          Timetable platform for schools
+        </div>
+        <h1 style="margin-top:20px;font-size:clamp(30px,5.2vw,52px);line-height:1.08;letter-spacing:-0.025em;font-weight:600;color:#0E1B33">Plan the school week without the spreadsheet chaos.</h1>
+        <p style="margin-top:18px;font-size:clamp(16px,2.2vw,19px);line-height:1.55;color:#3A4A63;max-width:660px">ClassGrid brings teacher availability, teaching loads and every class timetable into one dependable workspace.</p>
+        <div style="margin-top:28px;display:flex;flex-wrap:wrap;gap:12px">
+          <a href="#cta" style="display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 20px;background:#1B4DD8;border:1px solid #1B4DD8;border-radius:6px;color:#FFFFFF;font-size:15px;font-weight:500;text-decoration:none" style-hover="background:#163FB0;border-color:#163FB0;color:#FFFFFF;text-decoration:none">Create your school workspace</a>
+          <a href="#how" style="display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 20px;background:#FFFFFF;border:1px solid #D8DDE6;border-radius:6px;color:#0E1B33;font-size:15px;font-weight:500;text-decoration:none" style-hover="background:#F6F7F9;color:#0E1B33;text-decoration:none">See how ClassGrid works</a>
+        </div>
+        <p style="margin-top:16px;font-size:13px;color:#6B7A90">No credit card. Your school data stays private.</p>
+      </div>
+
+      <div style="margin-top:44px;border:1px solid #E3E7EE;border-radius:8px;background:#FFFFFF;box-shadow:0 1px 2px rgba(14,27,51,0.04),0 12px 28px -18px rgba(14,27,51,0.18);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;borderBottom:1px solid #E3E7EE;background:#FCFCFD;flex-wrap:wrap">
+          <span style="width:28px;height:28px;border-radius:6px;background:#0E1B33;color:#FFFFFF;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">RH</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#0E1B33">Riverside High School</div>
+            <div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">2026 / 2027 · Term 1</div>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#3A4A63;border:1px solid #E3E7EE;background:#FFFFFF;border-radius:4px;padding:4px 8px">Draft v7</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:#0F7A48;background:#ECF6F0;border:1px solid #CFE7DA;border-radius:4px;padding:4px 8px">
+              <span style="width:5px;height:5px;border-radius:50%;background:#0F7A48"></span>Validated
+            </span>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;padding:10px 16px;borderBottom:1px solid #E3E7EE;overflow-x:auto">
+          <button onClick="{{ setClassView }}" style="{{ tabClass }}">Class view</button>
+          <button onClick="{{ setTeacherView }}" style="{{ tabTeacher }}">Teacher view</button>
+          <button onClick="{{ setMasterView }}" style="{{ tabMaster }}">Master view</button>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-left:12px">
+            <span style="font-size:11px;color:#6B7A90;white-space:nowrap">Selected class</span>
+            <span style="font-size:12px;font-weight:600;color:#0E1B33;border:1px solid #D8DDE6;border-radius:4px;padding:5px 10px;white-space:nowrap">Form 5 &nbsp;▾</span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:10px;padding:12px 16px;borderBottom:1px solid #E3E7EE;background:#F9FAFB">
+          <span style="font-size:12px;color:#3A4A63"><strong style="font-weight:600;color:#0E1B33">164</strong> lessons scheduled</span>
+          <span style="color:#D8DDE6">|</span>
+          <span style="font-size:12px;color:#0F7A48"><strong style="font-weight:600">0</strong> teacher or class clashes</span>
+          <span style="color:#D8DDE6">|</span>
+          <span style="font-size:12px;color:#3A4A63">Availability respected</span>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#0F7A48">
+            <span style="width:6px;height:6px;border-radius:50%;background:#0F7A48"></span>Ready to publish
+          </span>
+        </div>
+
+        <div style="overflow-x:auto;padding:16px">
+          <div style="min-width:940px;display:grid;grid-template-columns:132px repeat(5,minmax(148px,1fr));gap:6px">
+            <div></div>
+            <div style="font-size:12px;font-weight:600;color:#0E1B33;padding:6px 8px">Monday</div>
+            <div style="font-size:12px;font-weight:600;color:#0E1B33;padding:6px 8px">Tuesday</div>
+            <div style="font-size:12px;font-weight:600;color:#0E1B33;padding:6px 8px">Wednesday</div>
+            <div style="font-size:12px;font-weight:600;color:#0E1B33;padding:6px 8px">Thursday</div>
+            <div style="font-size:12px;font-weight:600;color:#0E1B33;padding:6px 8px">Friday</div>
+
+            <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:600;color:#0E1B33">Period 1</div><div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">08:00–08:45</div></div>
+            <div style="padding:8px 10px;background:#EDF1FD;border:1px solid #DCE4FA;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#23409E">Mathematics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">A. Mensah</div></div>
+            <div style="padding:8px 10px;background:#F2F0FA;border:1px solid #E3DEF4;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4B3E96">English</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">R. Okafor</div></div>
+            <div style="padding:8px 10px;background:#ECF2F6;border:1px solid #DAE4EC;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#1F5876">Physics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">L. Chen</div></div>
+            <div style="padding:8px 10px;background:#EDF1FD;border:1px solid #DCE4FA;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#23409E">Mathematics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">A. Mensah</div></div>
+            <div style="padding:8px 10px;background:#FAF1EC;border:1px solid #F0E0D6;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#8A4A24">Biology</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">S. Patel</div></div>
+
+            <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:600;color:#0E1B33">Period 2</div><div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">08:45–09:30</div></div>
+            <div style="padding:8px 10px;background:#F7F4E9;border:1px solid #ECE5D0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#6E5A12">Computer Science</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">D. Ncube</div></div>
+            <div style="padding:8px 10px;background:#ECF2F6;border:1px solid #DAE4EC;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#1F5876">Physics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">L. Chen</div></div>
+            <div style="padding:8px 10px;background:#F2F0FA;border:1px solid #E3DEF4;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4B3E96">English</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">R. Okafor</div></div>
+            <div style="padding:8px 10px;background:#FAF1EC;border:1px solid #F0E0D6;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#8A4A24">Biology</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">S. Patel</div></div>
+            <div style="padding:8px 10px;background:#EDF1FD;border:1px solid #DCE4FA;border-radius:6px;position:relative"><div style="font-size:13px;font-weight:600;color:#23409E">Mathematics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">A. Mensah</div><div style="position:absolute;top:7px;right:8px;display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;background:#23409E;border-radius:1px"></span><span style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:#23409E;letter-spacing:0.04em">LOCK</span></div></div>
+
+            <sc-if value="{{ showBreaks }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:500;color:#6B7A90">Break</div><div style="font-size:11px;color:#8A97A8;font-family:'IBM Plex Mono',monospace">09:30–09:45</div></div>
+              <div style="grid-column:span 5;background:#F6F7F9;border:1px dashed #E3E7EE;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8A97A8;font-family:'IBM Plex Mono',monospace;letter-spacing:0.06em;padding:6px">MORNING BREAK</div>
+            </sc-if>
+
+            <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:600;color:#0E1B33">Period 3</div><div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">09:45–10:30</div></div>
+            <div style="padding:8px 10px;background:#F2F0FA;border:1px solid #E3DEF4;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4B3E96">English</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">R. Okafor</div></div>
+            <div style="padding:8px 10px;background:#EDF1FD;border:1px solid #DCE4FA;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#23409E">Mathematics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">A. Mensah</div></div>
+            <div style="padding:8px 10px;background:#F3F2F0;border:1px solid #E6E4E0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4A4A45">Geography</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">M. Torres</div></div>
+            <div style="padding:8px 10px;background:#F7F4E9;border:1px solid #ECE5D0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#6E5A12">Computer Science</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">D. Ncube</div></div>
+            <div style="padding:8px 10px;background:#ECF2F6;border:1px solid #DAE4EC;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#1F5876">Physics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">L. Chen</div></div>
+
+            <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:600;color:#0E1B33">Period 4</div><div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">10:30–11:15</div></div>
+            <div style="padding:8px 10px;background:#FAF1EC;border:1px solid #F0E0D6;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#8A4A24">Biology</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">S. Patel</div></div>
+            <div style="padding:8px 10px;background:#F3F2F0;border:1px solid #E6E4E0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4A4A45">History</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">J. Adeyemi</div></div>
+            <div style="padding:8px 10px;background:#EDF1FD;border:1px solid #DCE4FA;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#23409E">Mathematics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">A. Mensah</div></div>
+            <div style="padding:8px 10px;background:#F2F0FA;border:1px solid #E3DEF4;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4B3E96">English</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">R. Okafor</div></div>
+            <div style="padding:8px 10px;background:#F7F4E9;border:1px solid #ECE5D0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#6E5A12">Computer Science</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">D. Ncube</div></div>
+
+            <sc-if value="{{ showBreaks }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:500;color:#6B7A90">Lunch</div><div style="font-size:11px;color:#8A97A8;font-family:'IBM Plex Mono',monospace">11:15–12:00</div></div>
+              <div style="grid-column:span 5;background:#F6F7F9;border:1px dashed #E3E7EE;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8A97A8;font-family:'IBM Plex Mono',monospace;letter-spacing:0.06em;padding:6px">LUNCH</div>
+            </sc-if>
+
+            <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:600;color:#0E1B33">Period 5</div><div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">12:00–12:45</div></div>
+            <div style="padding:8px 10px;background:#ECF2F6;border:1px solid #DAE4EC;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#1F5876">Physics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">L. Chen</div></div>
+            <div style="padding:8px 10px;background:#FAF1EC;border:1px solid #F0E0D6;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#8A4A24">Biology</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">S. Patel</div></div>
+            <div style="padding:8px 10px;background:#F7F4E9;border:1px solid #ECE5D0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#6E5A12">Computer Science</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">D. Ncube</div></div>
+            <div style="padding:8px 10px;background:#F3F2F0;border:1px solid #E6E4E0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4A4A45">Geography</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">M. Torres</div></div>
+            <div style="padding:8px 10px;background:#F2F0FA;border:1px solid #E3DEF4;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4B3E96">English</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">R. Okafor</div></div>
+
+            <div style="padding:8px;border-right:1px solid #EEF0F4"><div style="font-size:12px;font-weight:600;color:#0E1B33">Period 6</div><div style="font-size:11px;color:#6B7A90;font-family:'IBM Plex Mono',monospace">12:45–13:30</div></div>
+            <div style="padding:8px 10px;background:#F3F2F0;border:1px solid #E6E4E0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#4A4A45">History</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">J. Adeyemi</div></div>
+            <div style="padding:8px 10px;background:#F7F4E9;border:1px solid #ECE5D0;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#6E5A12">Computer Science</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">D. Ncube</div></div>
+            <div style="padding:8px 10px;background:#FAF1EC;border:1px solid #F0E0D6;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#8A4A24">Biology</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">S. Patel</div></div>
+            <div style="padding:8px 10px;background:#ECF2F6;border:1px solid #DAE4EC;border-radius:6px"><div style="font-size:13px;font-weight:600;color:#1F5876">Physics</div><div style="font-size:11px;color:#5D6B84;margin-top:2px">L. Chen</div></div>
+            <div style="padding:8px 10px;background:#FFFFFF;border:1px dashed #D8DDE6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8A97A8">Free period</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Problem" style="margin-top:88px;background:#F6F7F9;borderTop:1px solid #E3E7EE;borderBottom:1px solid #E3E7EE;padding:72px 24px">
+    <div style="max-width:1240px;margin:0 auto">
+      <h2 style="font-size:clamp(24px,3.6vw,36px);line-height:1.15;letter-spacing:-0.02em;font-weight:600;max-width:640px">Timetabling shouldn’t take a week every term.</h2>
+      <p style="margin-top:14px;font-size:16px;line-height:1.6;color:#3A4A63;max-width:640px">Most schools still assemble the week by hand. The work is repetitive, fragile and hard to check — and every small change starts it again.</p>
+      <div style="margin-top:40px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:#FFFFFF;border:1px solid #E3E7EE;border-radius:8px;overflow:hidden">
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:22px">
+          <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A97A8;letter-spacing:0.06em">01</div>
+          <h3 style="margin-top:10px;font-size:15px;font-weight:600">Rebuilt from scratch each term</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">Last term’s spreadsheet is copied, renamed and slowly broken by hand.</p>
+        </div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:22px">
+          <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A97A8;letter-spacing:0.06em">02</div>
+          <h3 style="margin-top:10px;font-size:15px;font-weight:600">Clashes found after printing</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">One teacher in two rooms at once, discovered by a staff member in week one.</p>
+        </div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:22px">
+          <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A97A8;letter-spacing:0.06em">03</div>
+          <h3 style="margin-top:10px;font-size:15px;font-weight:600">Every change means a recheck</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">A single availability update forces a manual pass over every affected class.</p>
+        </div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:22px">
+          <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A97A8;letter-spacing:0.06em">04</div>
+          <h3 style="margin-top:10px;font-size:15px;font-weight:600">Three copies, three truths</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">Class, teacher and master versions drift apart the moment one is edited.</p>
+        </div>
+      </div>
+
+      <div style="margin-top:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+        <div style="background:#FFFFFF;border:1px solid #E3E7EE;border-radius:8px;overflow:hidden">
+          <div style="padding:14px 20px;borderBottom:1px solid #E3E7EE;font-size:13px;font-weight:600;color:#3A4A63">Working manually</div>
+          <div style="padding:6px 20px 18px">
+            <div style="display:flex;gap:10px;padding:12px 0;borderBottom:1px solid #F1F3F6"><span style="color:#8A97A8;font-size:15px;line-height:1.4">—</span><span style="font-size:14px;line-height:1.5;color:#3A4A63">Three to five days of admin time each term</span></div>
+            <div style="display:flex;gap:10px;padding:12px 0;borderBottom:1px solid #F1F3F6"><span style="color:#8A97A8;font-size:15px;line-height:1.4">—</span><span style="font-size:14px;line-height:1.5;color:#3A4A63">Clashes checked by eye, class by class</span></div>
+            <div style="display:flex;gap:10px;padding:12px 0;borderBottom:1px solid #F1F3F6"><span style="color:#8A97A8;font-size:15px;line-height:1.4">—</span><span style="font-size:14px;line-height:1.5;color:#3A4A63">Availability held in notes and memory</span></div>
+            <div style="display:flex;gap:10px;padding:12px 0"><span style="color:#8A97A8;font-size:15px;line-height:1.4">—</span><span style="font-size:14px;line-height:1.5;color:#3A4A63">Exports re-formatted by hand for staff</span></div>
+          </div>
+        </div>
+        <div style="background:#FFFFFF;border:1px solid #CFE7DA;border-radius:8px;overflow:hidden">
+          <div style="padding:14px 20px;borderBottom:1px solid #CFE7DA;background:#ECF6F0;font-size:13px;font-weight:600;color:#0F7A48">With ClassGrid</div>
+          <div style="padding:6px 20px 18px">
+            <div style="display:flex;gap:10px;padding:12px 0;borderBottom:1px solid #F1F3F6"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><span style="font-size:14px;line-height:1.5;color:#0E1B33">A full draft generated in minutes</span></div>
+            <div style="display:flex;gap:10px;padding:12px 0;borderBottom:1px solid #F1F3F6"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><span style="font-size:14px;line-height:1.5;color:#0E1B33">Clashes blocked before they are saved</span></div>
+            <div style="display:flex;gap:10px;padding:12px 0;borderBottom:1px solid #F1F3F6"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><span style="font-size:14px;line-height:1.5;color:#0E1B33">Availability stored once, applied everywhere</span></div>
+            <div style="display:flex;gap:10px;padding:12px 0"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><span style="font-size:14px;line-height:1.5;color:#0E1B33">Class, teacher and master PDFs from one source</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" data-screen-label="How it works" style="padding:76px 24px">
+    <div style="max-width:1240px;margin:0 auto">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#1B4DD8;letter-spacing:0.08em">HOW IT WORKS</div>
+          <h2 style="margin-top:12px;font-size:clamp(24px,3.4vw,34px);line-height:1.15;letter-spacing:-0.02em;font-weight:600">Four steps from setup to published week</h2>
+        </div>
+        <a href="#setup" style="font-size:14px;font-weight:500">Read the setup guide →</a>
+      </div>
+      <div style="margin-top:36px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;background:#FFFFFF;border:1px solid #E3E7EE;border-radius:8px;overflow:hidden">
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:24px 22px 26px">
+          <div style="width:28px;height:28px;border-radius:6px;background:#0E1B33;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace">1</div>
+          <h3 style="margin-top:16px;font-size:16px;font-weight:600">Set up your school</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">Academic year, teaching days, period times and breaks.</p>
+        </div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:24px 22px 26px">
+          <div style="width:28px;height:28px;border-radius:6px;background:#0E1B33;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace">2</div>
+          <h3 style="margin-top:16px;font-size:16px;font-weight:600">Add staff, subjects and classes</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">Levels, class sections, subject list and teacher profiles.</p>
+        </div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:24px 22px 26px">
+          <div style="width:28px;height:28px;border-radius:6px;background:#0E1B33;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace">3</div>
+          <h3 style="margin-top:16px;font-size:16px;font-weight:600">Enter availability and loads</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">Mark unavailable periods and set weekly lessons per subject.</p>
+        </div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:24px 22px 26px">
+          <div style="width:28px;height:28px;border-radius:6px;background:#1B4DD8;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;font-family:'IBM Plex Mono',monospace">4</div>
+          <h3 style="margin-top:16px;font-size:16px;font-weight:600">Generate, review and publish</h3>
+          <p style="margin-top:8px;font-size:14px;line-height:1.55;color:#3A4A63">Validate the draft, adjust by hand, then export PDFs for staff.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="product" data-screen-label="Capabilities" style="background:#F6F7F9;borderTop:1px solid #E3E7EE;borderBottom:1px solid #E3E7EE;padding:72px 24px">
+    <div style="max-width:1240px;margin:0 auto">
+      <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#1B4DD8;letter-spacing:0.08em">PRODUCT</div>
+      <h2 style="margin-top:12px;font-size:clamp(24px,3.4vw,34px);line-height:1.15;letter-spacing:-0.02em;font-weight:600;max-width:620px">Everything the timetable office actually needs</h2>
+      <div style="margin-top:36px;display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:1px;background:#FFFFFF;border:1px solid #E3E7EE;border-radius:8px;overflow:hidden">
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Academic schedule</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Years, terms, teaching days, period times and breaks.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Levels and class sections</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Forms, streams and sections with their own subject sets.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Subject management</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Codes, weekly periods, colours and double-period rules.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Teacher profiles</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Subjects taught, maximum load and department.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Teacher availability</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Free and blocked periods recorded per teacher, per day.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Teaching assignments</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Who teaches which subject to which class section.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Conflict-free generation</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Build a full week that respects every recorded constraint.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Drag-and-drop editor</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Move lessons manually; invalid drops are refused.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">Validation and coverage</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Missing lessons and under-taught subjects listed per class.</p></div>
+        <div style="background:#FFFFFF;box-shadow:0 0 0 1px #E3E7EE;padding:20px"><h3 style="font-size:14px;font-weight:600">PDF exports</h3><p style="margin-top:6px;font-size:13px;line-height:1.55;color:#3A4A63">Class, teacher and master timetables, print-ready.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Guarantees" style="padding:76px 24px">
+    <div style="max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:40px;align-items:start">
+      <div>
+        <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#1B4DD8;letter-spacing:0.08em">SCHEDULING GUARANTEES</div>
+        <h2 style="margin-top:12px;font-size:clamp(24px,3.4vw,34px);line-height:1.15;letter-spacing:-0.02em;font-weight:600">Rules the generator will not break</h2>
+        <p style="margin-top:14px;font-size:16px;line-height:1.6;color:#3A4A63;max-width:460px">Every generated or edited timetable is checked against the same set of constraints. If a placement would break one, ClassGrid refuses it and tells you why.</p>
+        <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><div><div style="font-size:15px;font-weight:600">No teacher clashes</div><div style="font-size:14px;color:#3A4A63;line-height:1.5">A teacher is never scheduled with two classes in one period.</div></div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><div><div style="font-size:15px;font-weight:600">No class clashes</div><div style="font-size:14px;color:#3A4A63;line-height:1.5">Each class section holds exactly one lesson per period.</div></div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><div><div style="font-size:15px;font-weight:600">Teacher availability respected</div><div style="font-size:14px;color:#3A4A63;line-height:1.5">Blocked periods are treated as unavailable, not as preferences.</div></div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><div><div style="font-size:15px;font-weight:600">Locked lessons stay in place</div><div style="font-size:14px;color:#3A4A63;line-height:1.5">Regeneration moves unlocked lessons only.</div></div></div>
+          <div style="display:flex;gap:12px;align-items:flex-start"><span style="color:#0F7A48;font-size:14px;line-height:1.5">✓</span><div><div style="font-size:15px;font-weight:600">Balanced lesson distribution</div><div style="font-size:14px;color:#3A4A63;line-height:1.5">Subjects spread across the week instead of stacking on one day.</div></div></div>
+        </div>
+      </div>
+      <div style="border:1px solid #E3E7EE;border-radius:8px;background:#FFFFFF;box-shadow:0 1px 2px rgba(14,27,51,0.04);overflow:hidden">
+        <div style="padding:14px 18px;borderBottom:1px solid #E3E7EE;background:#FCFCFD;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <span style="font-size:13px;font-weight:600">Constraint check · Form 5</span>
+          <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#6B7A90">run 12:04</span>
+        </div>
+        <div style="padding:6px 18px 14px">
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:13px 0;borderBottom:1px solid #F1F3F6"><span style="font-size:13px;color:#3A4A63">Teacher clashes</span><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#0F7A48">0 found</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:13px 0;borderBottom:1px solid #F1F3F6"><span style="font-size:13px;color:#3A4A63">Class clashes</span><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#0F7A48">0 found</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:13px 0;borderBottom:1px solid #F1F3F6"><span style="font-size:13px;color:#3A4A63">Availability violations</span><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#0F7A48">0 found</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:13px 0;borderBottom:1px solid #F1F3F6"><span style="font-size:13px;color:#3A4A63">Locked lessons preserved</span><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#0F7A48">18 / 18</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:13px 0"><span style="font-size:13px;color:#3A4A63">Daily load variance</span><span style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#3A4A63">±1 period</span></div>
+        </div>
+        <div style="padding:12px 18px;borderTop:1px solid #E3E7EE;background:#ECF6F0;font-size:12px;color:#0F7A48;font-weight:500">Conflict-free · safe to publish</div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="Workflow preview" style="background:#F6F7F9;borderTop:1px solid #E3E7EE;borderBottom:1px solid #E3E7EE;padding:72px 24px">
+    <div style="max-width:1240px;margin:0 auto">
+      <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#1B4DD8;letter-spacing:0.08em">WORKFLOW</div>
+      <h2 style="margin-top:12px;font-size:clamp(24px,3.4vw,34px);line-height:1.15;letter-spacing:-0.02em;font-weight:600;max-width:620px">Find the gaps, repair the class, publish the week</h2>
+      <div style="margin-top:32px;border:1px solid #E3E7EE;border-radius:8px;background:#FFFFFF;box-shadow:0 1px 2px rgba(14,27,51,0.04);overflow:hidden">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 18px;borderBottom:1px solid #E3E7EE;background:#FCFCFD">
+          <span style="font-size:13px;font-weight:600">Validation · Term 1 draft v7</span>
+          <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#6B7A90">28 classes checked</span>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:#8A5A12;background:#F7F2E6;border:1px solid #EDE2C9;border-radius:4px;padding:4px 8px">2 classes need attention</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+          <div style="borderRight:1px solid #E3E7EE">
+            <div style="padding:16px 18px;borderBottom:1px solid #F1F3F6">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+                <div>
+                  <div style="font-size:14px;font-weight:600">Form 3B</div>
+                  <div style="margin-top:4px;font-size:13px;color:#3A4A63">Missing 2 Mathematics periods · 1 unfilled Friday slot</div>
+                </div>
+                <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A5A12;white-space:nowrap">INCOMPLETE</span>
+              </div>
+              <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+                <button style="min-height:44px;padding:0 14px;font-size:13px;font-weight:500;color:#FFFFFF;background:#1B4DD8;border:1px solid #1B4DD8;border-radius:6px;cursor:pointer" style-hover="background:#163FB0">Repair class</button>
+                <button style="min-height:44px;padding:0 14px;font-size:13px;font-weight:500;color:#0E1B33;background:#FFFFFF;border:1px solid #D8DDE6;border-radius:6px;cursor:pointer" style-hover="background:#F6F7F9">Regenerate unlocked lessons</button>
+              </div>
+            </div>
+            <div style="padding:16px 18px;borderBottom:1px solid #F1F3F6">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+                <div>
+                  <div style="font-size:14px;font-weight:600">Form 1A</div>
+                  <div style="margin-top:4px;font-size:13px;color:#3A4A63">Missing 1 Physics period after availability change</div>
+                </div>
+                <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#8A5A12;white-space:nowrap">INCOMPLETE</span>
+              </div>
+              <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+                <button style="min-height:44px;padding:0 14px;font-size:13px;font-weight:500;color:#0E1B33;background:#FFFFFF;border:1px solid #D8DDE6;border-radius:6px;cursor:pointer" style-hover="background:#F6F7F9">Repair class</button>
+                <button style="min-height:44px;padding:0 14px;font-size:13px;font-weight:500;color:#0E1B33;background:#FFFFFF;border:1px solid #D8DDE6;border-radius:6px;cursor:pointer" style-hover="background:#F6F7F9">Open editor</button>
+              </div>
+            </div>
+            <div style="padding:16px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center">
+              <div style="font-size:13px;color:#3A4A63">26 other classes complete</div>
+              <span style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:#0F7A48">NO ISSUES</span>
+            </div>
+          </div>
+          <div style="padding:18px;background:#FCFCFD">
+            <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#6B7A90;letter-spacing:0.06em">PUBLISH</div>
+            <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#3A4A63">Lessons scheduled<span style="font-family:'IBM Plex Mono',monospace;color:#0E1B33">164</span></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#3A4A63">Locked lessons<span style="font-family:'IBM Plex Mono',monospace;color:#0E1B33">18</span></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#3A4A63">Clashes<span style="font-family:'IBM Plex Mono',monospace;color:#0F7A48">0</span></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;color:#3A4A63">Classes complete<span style="font-family:'IBM Plex Mono',monospace;color:#0E1B33">26 / 28</span></div>
+            </div>
+            <div style="margin-top:18px;padding-top:16px;borderTop:1px solid #E3E7EE;display:flex;flex-direction:column;gap:8px">
+              <button style="min-height:42px;padding:0 14px;font-size:14px;font-weight:500;color:#FFFFFF;background:#1B4DD8;border:1px solid #1B4DD8;border-radius:6px;cursor:pointer" style-hover="background:#163FB0">Publish timetable</button>
+              <button style="min-height:42px;padding:0 14px;font-size:14px;font-weight:500;color:#0E1B33;background:#FFFFFF;border:1px solid #D8DDE6;border-radius:6px;cursor:pointer" style-hover="background:#F6F7F9">Export PDFs</button>
+              <p style="margin-top:4px;font-size:12px;line-height:1.5;color:#6B7A90">Publishing locks the draft and issues class, teacher and master copies together.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="questions" data-screen-label="FAQ" style="padding:76px 24px">
+    <div style="max-width:860px;margin:0 auto">
+      <h2 style="font-size:clamp(24px,3.4vw,34px);line-height:1.15;letter-spacing:-0.02em;font-weight:600">Questions</h2>
+      <div style="margin-top:28px;border:1px solid #E3E7EE;border-radius:8px;overflow:hidden">
+        <div style="borderBottom:1px solid #E3E7EE">
+          <button onClick="{{ toggle0 }}" style="width:100%;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 20px;background:#FFFFFF;border:0;cursor:pointer;text-align:left;font-size:15px;font-weight:600;color:#0E1B33;min-height:56px" style-hover="background:#FAFBFC">Can ClassGrid match our academic calendar?<span style="font-size:18px;color:#6B7A90;font-weight:400">{{ sign0 }}</span></button>
+          <sc-if value="{{ open0 }}" hint-placeholder-val="{{ true }}"><p style="padding:0 20px 20px;font-size:14px;line-height:1.6;color:#3A4A63;max-width:660px">Yes. You define the academic year, terms, teaching days, the number of periods, their exact start and end times, and where breaks fall. Six-day weeks and split sessions are supported.</p></sc-if>
+        </div>
+        <div style="borderBottom:1px solid #E3E7EE">
+          <button onClick="{{ toggle1 }}" style="width:100%;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 20px;background:#FFFFFF;border:0;cursor:pointer;text-align:left;font-size:15px;font-weight:600;color:#0E1B33;min-height:56px" style-hover="background:#FAFBFC">What happens when teacher availability changes?<span style="font-size:18px;color:#6B7A90;font-weight:400">{{ sign1 }}</span></button>
+          <sc-if value="{{ open1 }}" hint-placeholder-val="{{ false }}"><p style="padding:0 20px 20px;font-size:14px;line-height:1.6;color:#3A4A63;max-width:660px">Update the teacher’s availability and ClassGrid re-validates every affected class, lists the lessons that no longer fit, and offers to repair those classes without touching locked lessons.</p></sc-if>
+        </div>
+        <div style="borderBottom:1px solid #E3E7EE">
+          <button onClick="{{ toggle2 }}" style="width:100%;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 20px;background:#FFFFFF;border:0;cursor:pointer;text-align:left;font-size:15px;font-weight:600;color:#0E1B33;min-height:56px" style-hover="background:#FAFBFC">Can administrators modify a generated timetable?<span style="font-size:18px;color:#6B7A90;font-weight:400">{{ sign2 }}</span></button>
+          <sc-if value="{{ open2 }}" hint-placeholder-val="{{ false }}"><p style="padding:0 20px 20px;font-size:14px;line-height:1.6;color:#3A4A63;max-width:660px">Yes. Lessons can be dragged between periods, swapped or cleared. Any move that would create a clash or break availability is refused with an explanation, and lessons can be locked so regeneration leaves them alone.</p></sc-if>
+        </div>
+        <div style="borderBottom:1px solid #E3E7EE">
+          <button onClick="{{ toggle3 }}" style="width:100%;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 20px;background:#FFFFFF;border:0;cursor:pointer;text-align:left;font-size:15px;font-weight:600;color:#0E1B33;min-height:56px" style-hover="background:#FAFBFC">Can we export class and teacher timetables?<span style="font-size:18px;color:#6B7A90;font-weight:400">{{ sign3 }}</span></button>
+          <sc-if value="{{ open3 }}" hint-placeholder-val="{{ false }}"><p style="padding:0 20px 20px;font-size:14px;line-height:1.6;color:#3A4A63;max-width:660px">Every published version exports as print-ready PDFs: one per class, one per teacher, and a master grid for the staff room — all generated from the same source, so the copies cannot disagree.</p></sc-if>
+        </div>
+        <div>
+          <button onClick="{{ toggle4 }}" style="width:100%;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 20px;background:#FFFFFF;border:0;cursor:pointer;text-align:left;font-size:15px;font-weight:600;color:#0E1B33;min-height:56px" style-hover="background:#FAFBFC">Is each school’s data private?<span style="font-size:18px;color:#6B7A90;font-weight:400">{{ sign4 }}</span></button>
+          <sc-if value="{{ open4 }}" hint-placeholder-val="{{ false }}"><p style="padding:0 20px 20px;font-size:14px;line-height:1.6;color:#3A4A63;max-width:660px">Each school has its own isolated workspace. Staff and timetable data are visible only to the administrators you invite, and nothing is shared between schools.</p></sc-if>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cta" data-screen-label="Final CTA" style="padding:0 24px 76px">
+    <div style="max-width:1240px;margin:0 auto;background:#0E1B33;border-radius:8px;padding:clamp(32px,5vw,56px)">
+      <h2 style="font-size:clamp(24px,3.4vw,34px);line-height:1.15;letter-spacing:-0.02em;font-weight:600;color:#FFFFFF;max-width:600px">Build your next timetable from one reliable workspace.</h2>
+      <p style="margin-top:14px;font-size:16px;line-height:1.6;color:#B6C0D2;max-width:540px">Set up your school once, then generate, review and publish every term from the same place.</p>
+      <div style="margin-top:28px;display:flex;flex-wrap:wrap;align-items:center;gap:20px">
+        <a href="#top" style="display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 20px;background:#1B4DD8;border:1px solid #1B4DD8;border-radius:6px;color:#FFFFFF;font-size:15px;font-weight:500;text-decoration:none" style-hover="background:#2F5DE0;border-color:#2F5DE0;color:#FFFFFF;text-decoration:none">Create your school workspace</a>
+        <a href="#setup" style="font-size:15px;font-weight:500;color:#FFFFFF;text-decoration:none;borderBottom:1px solid rgba(255,255,255,0.35);padding-bottom:2px" style-hover="color:#FFFFFF;text-decoration:none;border-color:#FFFFFF">Read the setup guide</a>
+      </div>
+    </div>
+  </section>
+
+  <footer id="setup" data-screen-label="Footer" style="borderTop:1px solid #E3E7EE;background:#FAFBFC;padding:56px 24px 32px">
+    <div style="max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px">
+      <div style="max-width:300px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:24px;height:24px;border-radius:6px;background:#1B4DD8;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;padding:5px">
+            <span style="background:#FFFFFF;border-radius:1px"></span>
+            <span style="background:rgba(255,255,255,0.55);border-radius:1px"></span>
+            <span style="background:rgba(255,255,255,0.55);border-radius:1px"></span>
+            <span style="background:#FFFFFF;border-radius:1px"></span>
+          </span>
+          <span style="font-size:16px;font-weight:600">ClassGrid</span>
+        </div>
+        <p style="margin-top:12px;font-size:13px;line-height:1.6;color:#3A4A63">School timetable planning, generation and publishing for principals, administrators and timetable officers.</p>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#0E1B33;letter-spacing:0.02em">Product</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <a href="#product" style="font-size:13px;color:#3A4A63">Capabilities</a>
+          <a href="#how" style="font-size:13px;color:#3A4A63">How it works</a>
+          <a href="#top" style="font-size:13px;color:#3A4A63">Timetable editor</a>
+          <a href="#top" style="font-size:13px;color:#3A4A63">PDF exports</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#0E1B33;letter-spacing:0.02em">Resources</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <a href="#setup" style="font-size:13px;color:#3A4A63">Setup guide</a>
+          <a href="#questions" style="font-size:13px;color:#3A4A63">Questions</a>
+          <a href="#signin" style="font-size:13px;color:#3A4A63">Sign in</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#0E1B33;letter-spacing:0.02em">Legal</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <a href="#privacy" style="font-size:13px;color:#3A4A63">Privacy</a>
+          <a href="#terms" style="font-size:13px;color:#3A4A63">Terms</a>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:1240px;margin:36px auto 0;padding-top:20px;borderTop:1px solid #E3E7EE;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between">
+      <span style="font-size:12px;color:#6B7A90">© 2026 ClassGrid. All rights reserved.</span>
+      <span style="font-size:12px;color:#6B7A90">Built for school timetable offices.</span>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showBreaks&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Timetable preview&quot;},&quot;stickyNav&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Navigation&quot;}}">
+class Component extends DCLogic {
+  state = { mobile: false, menu: false, view: "class", open: 0 };
+
+  componentDidMount() {
+    this.mq = window.matchMedia("(max-width: 900px)");
+    this.onMq = (e) => this.setState({ mobile: e.matches, menu: false });
+    this.setState({ mobile: this.mq.matches });
+    this.mq.addEventListener("change", this.onMq);
+  }
+  componentWillUnmount() {
+    if (this.mq) this.mq.removeEventListener("change", this.onMq);
+  }
+
+  tab(active) {
+    return {
+      minHeight: 36, padding: "0 14px", fontSize: 13, fontWeight: 500, cursor: "pointer",
+      borderRadius: 6, whiteSpace: "nowrap",
+      background: active ? "#EDF1FD" : "#FFFFFF",
+      color: active ? "#23409E" : "#3A4A63",
+      border: active ? "1px solid #DCE4FA" : "1px solid transparent"
+    };
+  }
+
+  renderVals() {
+    const v = this.state.view;
+    const o = this.state.open;
+    const set = (view) => () => this.setState({ view });
+    const t = (i) => () => this.setState({ open: o === i ? -1 : i });
+    return {
+      isMobile: this.state.mobile,
+      isDesktop: !this.state.mobile,
+      menuOpen: this.state.mobile && this.state.menu,
+      toggleMenu: () => this.setState((s) => ({ menu: !s.menu })),
+      closeMenu: () => this.setState({ menu: false }),
+      navPosition: (this.props.stickyNav ?? true) ? "sticky" : "relative",
+      showBreaks: this.props.showBreaks ?? true,
+      tabClass: this.tab(v === "class"),
+      tabTeacher: this.tab(v === "teacher"),
+      tabMaster: this.tab(v === "master"),
+      setClassView: set("class"),
+      setTeacherView: set("teacher"),
+      setMasterView: set("master"),
+      open0: o === 0, open1: o === 1, open2: o === 2, open3: o === 3, open4: o === 4,
+      sign0: o === 0 ? "−" : "+", sign1: o === 1 ? "−" : "+", sign2: o === 2 ? "−" : "+",
+      sign3: o === 3 ? "−" : "+", sign4: o === 4 ? "−" : "+",
+      toggle0: t(0), toggle1: t(1), toggle2: t(2), toggle3: t(3), toggle4: t(4)
+    };
+  }
+}
+</script>
+</body>
+</html>

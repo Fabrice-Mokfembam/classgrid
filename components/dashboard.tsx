@@ -14,11 +14,11 @@ function pagePath(schoolSlug: string, id: Page) { return id === "dashboard" ? `/
 function Stat({ icon: Icon, n, label, note }: { icon: any; n: string; label: string; note: string }) {
   return <article className="stat-card"><span><Icon /></span><div><b>{n}</b><strong>{label}</strong><small>{note}</small></div></article>;
 }
-function PanelTitle({ title, action }: { title: string; action?: string }) {
-  return <div className="panel-title"><h3>{title}</h3>{action && <button>{action}<ArrowRight /></button>}</div>;
+function PanelTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return <div className="panel-title"><h3>{title}</h3>{action && <button type="button" onClick={onAction}>{action}<ArrowRight /></button>}</div>;
 }
-function ValidationItem({ good, title, text }: { good: boolean; title: string; text: string }) {
-  return <div className="validation-item">{good ? <CheckCircle2 className="good" /> : <AlertTriangle className="warn" />}<div><b>{title}</b><small>{text}</small></div><ArrowRight /></div>;
+function ValidationItem({ good, title, text, onClick }: { good: boolean; title: string; text: string; onClick: () => void }) {
+  return <button type="button" className="validation-item dashboard-validation-item" onClick={onClick}>{good ? <CheckCircle2 className="good" /> : <AlertTriangle className="warn" />}<div><b>{title}</b><small>{text}</small></div><ArrowRight /></button>;
 }
 function Quick({ icon: Icon, text, onClick }: { icon: any; text: string; onClick: () => void }) {
   return <button onClick={onClick}><Icon /><b>{text}</b><ArrowRight /></button>;
@@ -140,53 +140,52 @@ export function Dashboard() {
   const totalIssues = issues.hard + issues.soft;
 
   return <>
-    <section className="setup-banner">
-      <div className="ring"><span>{percent}%</span></div>
+    <section className={`setup-banner${nextStep ? "" : " complete"}`}>
+      {nextStep ? <div className="ring"><span>{percent}%</span></div> : <span className="setup-complete-icon"><CheckCircle2 /></span>}
       <div>
         <b>{nextStep ? "Complete your school setup" : "School setup complete"}</b>
         <p>{nextStep ? `Next up: ${nextStep.label}.` : "Everything's configured — generate a timetable whenever you're ready."}</p>
-        <div className="progress"><i style={{ width: `${percent}%` }} /></div>
-        <small>{completedCount} of {STEP_ORDER.length} steps completed</small>
+        {nextStep && <><div className="progress"><i style={{ width: `${percent}%` }} /></div><small>{completedCount} of {STEP_ORDER.length} steps completed</small></>}
       </div>
       <div className="setup-actions">
         <button className="btn" onClick={() => router.push("/guide")}><HelpCircle /> Setup guide</button>
-        <button className="btn primary" onClick={() => go(nextStep?.page ?? "generate")}>{nextStep ? "Continue setup" : "Go to Generate"} <ArrowRight /></button>
+        <button className="btn primary" onClick={() => go(nextStep?.page ?? (timetableInfo ? "timetable" : "generate"))}>{nextStep ? "Continue setup" : timetableInfo ? "Open timetable" : "Generate timetable"} <ArrowRight /></button>
       </div>
     </section>
-    <section className="stats-grid">
+    <section className="stats-grid dashboard-stat-band">
       <Stat icon={UsersRound} n={String(stats.teachersActive)} label="Teachers" note={stats.teachersTotal === stats.teachersActive ? "All active" : `${stats.teachersTotal - stats.teachersActive} inactive`} />
       <Stat icon={School2} n={String(stats.classSections)} label="Classes" note={`Across ${stats.levelsCount} level${stats.levelsCount === 1 ? "" : "s"}`} />
       <Stat icon={BookOpen} n={String(stats.subjectsTotal)} label="Subjects" note={`${stats.requiredPeriods} periods/week required`} />
-      <Stat icon={CalendarDays} n={String(timetableInfo ? timetableInfo.scheduled : stats.requiredPeriods)} label="Weekly lessons" note={timetableInfo ? `${timetableInfo.scheduled} of ${stats.requiredPeriods} assigned` : "Not generated yet"} />
+      <Stat icon={CalendarDays} n={timetableInfo ? `${timetableInfo.scheduled}/${stats.requiredPeriods}` : "—"} label="Lessons scheduled" note={timetableInfo ? `${Math.max(0, stats.requiredPeriods - timetableInfo.scheduled)} periods still needed` : "Not generated yet"} />
     </section>
     <section className="dashboard-grid">
+      <article className="panel status-card">
+        <PanelTitle title="Timetable status" />
+        {timetableInfo ? <>
+          <div className="status-content"><div className={`ring small${issues.hard > 0 ? " attention" : ""}`}><span>{timetableInfo.qualityScore ?? "—"}</span></div><div><span className="status-pill">{timetableInfo.status === "draft" ? "Draft" : timetableInfo.status} · Version {timetableInfo.version}</span><h3>{issues.hard > 0 ? "Needs attention" : "Ready for review"}</h3><p>{timetableInfo.scheduled} of {stats.requiredPeriods} lessons scheduled.</p></div></div>
+          <button className={`btn full${issues.hard > 0 ? " primary" : ""}`} onClick={() => go("timetable")}>{issues.hard > 0 ? "Review timetable issues" : "Open timetable editor"} <ArrowRight /></button>
+        </> : <div className="empty-inspector" style={{ padding: "24px 0" }}><CalendarDays /><h3>No timetable yet</h3><p>Generate one once your setup is complete.</p></div>}
+      </article>
+      <article className="panel validation">
+        <PanelTitle title="Validation summary" action="View details" onAction={() => go("timetable")} />
+        {timetableInfo ? <>
+          <p className="validation-head"><span className={`status-pill ${totalIssues > 0 ? "warning" : "success"}`}>{totalIssues === 0 ? "All clear" : `${totalIssues} item${totalIssues === 1 ? "" : "s"} need attention`}</span></p>
+          <ValidationItem good={issues.soft === 0} title="Soft preferences" text={issues.soft === 0 ? "No distribution warnings" : `${issues.soft} distribution warning${issues.soft === 1 ? "" : "s"}`} onClick={() => go("timetable")} />
+          <ValidationItem good={issues.hard === 0} title="Hard conflicts" text={issues.hard === 0 ? "No blocking conflicts" : `${issues.hard} unscheduled assignment${issues.hard === 1 ? "" : "s"}`} onClick={() => go("timetable")} />
+          <ValidationItem good title="Availability" text="Checked during generation" onClick={() => go("availability")} />
+        </> : <p style={{ fontSize: 11, color: "var(--muted)" }}>Generate a timetable to see validation results.</p>}
+      </article>
       <article className="panel workload">
-        <PanelTitle title="Weekly workload" action="View report" />
+        <PanelTitle title="Lessons by day" action="Open timetable" onAction={() => go("timetable")} />
         {weeklyBars.length === 0 ? <p style={{ fontSize: 11, color: "var(--muted)" }}>Generate a timetable to see this.</p> : <div className="bars">
           {weeklyBars.map(b => <div key={b.label}><span style={{ height: `${Math.max(4, b.count * 2.4)}px` }}><b>{b.count}</b></span><small>{b.label}</small></div>)}
         </div>}
       </article>
-      <article className="panel status-card">
-        <PanelTitle title="Timetable status" />
-        {timetableInfo ? <>
-          <div className="status-content"><div className="ring small"><span>{timetableInfo.qualityScore ?? "—"}</span></div><div><span className="status-pill">{timetableInfo.status === "draft" ? "Draft" : timetableInfo.status} · Version {timetableInfo.version}</span><h3>{issues.hard > 0 ? "Needs attention" : "Ready for review"}</h3><p>{timetableInfo.scheduled} of {stats.requiredPeriods} lessons scheduled.</p></div></div>
-          <button className="btn full" onClick={() => go("timetable")}>Open timetable editor <ArrowRight /></button>
-        </> : <div className="empty-inspector" style={{ padding: "24px 0" }}><CalendarDays /><h3>No timetable yet</h3><p>Generate one once your setup is complete.</p></div>}
-      </article>
-      <article className="panel validation">
-        <PanelTitle title="Validation summary" action="View details" />
-        {timetableInfo ? <>
-          <p className="validation-head"><span className={`status-pill ${totalIssues > 0 ? "warning" : "success"}`}>{totalIssues === 0 ? "All clear" : `${totalIssues} item${totalIssues === 1 ? "" : "s"} need attention`}</span></p>
-          <ValidationItem good={issues.soft === 0} title="Soft preferences" text={issues.soft === 0 ? "No distribution warnings" : `${issues.soft} distribution warning${issues.soft === 1 ? "" : "s"}`} />
-          <ValidationItem good={issues.hard === 0} title="Hard conflicts" text={issues.hard === 0 ? "No blocking conflicts" : `${issues.hard} unscheduled assignment${issues.hard === 1 ? "" : "s"}`} />
-          <ValidationItem good title="Availability" text="Checked during generation" />
-        </> : <p style={{ fontSize: 11, color: "var(--muted)" }}>Generate a timetable to see validation results.</p>}
-      </article>
     </section>
-    <section className="panel quick">
+    {nextStep && <section className="panel quick">
       <PanelTitle title="Quick actions" />
       <div className="quick-grid"><Quick icon={UsersRound} text="Add teacher" onClick={() => go("teachers")} /><Quick icon={School2} text="Add class" onClick={() => go("levels")} /><Quick icon={FileCheck2} text="Add assignment" onClick={() => go("assignments")} /><Quick icon={Sparkles} text="Generate timetable" onClick={() => go("generate")} /></div>
-    </section>
+    </section>}
     <section className="panel quick">
       <PanelTitle title="Recommended setup order" />
       <p className="setup-order-description">Each step depends on the one before it — assignments in particular need subjects configured per level first.</p>

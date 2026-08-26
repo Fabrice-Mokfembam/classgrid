@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, UsersRound, X } from "lucide-react";
+import { BookOpen, CheckCircle2, Hash, Info, Mail, Phone, School2, Search, UserRound, UsersRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { SchoolSubject, SchoolTeacher } from "@/lib/types";
-import { ErrorState, firstError, Skel, TableShell } from "@/components/shared";
+import { ErrorState, Explainer, firstError, Skel, TableShell } from "@/components/shared";
 
 function TeacherModal({ mode, initial, subjectOptions, classOptions, close, onSave }: { mode: "add" | "edit"; initial?: SchoolTeacher; subjectOptions: SchoolSubject[]; classOptions: { id: string; name: string; levelId: string }[]; close: () => void; onSave: (values: { fullName: string; teacherCode: string; email: string; phone: string; subjectIds: string[]; classSectionIds: string[] }) => Promise<void> }) {
   const [fullName, setFullName] = useState(initial?.fullName ?? "");
@@ -14,29 +14,40 @@ function TeacherModal({ mode, initial, subjectOptions, classOptions, close, onSa
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [subjectIds, setSubjectIds] = useState<string[]>(initial?.subjectIds ?? []);
   const [classSectionIds, setClassSectionIds] = useState<string[]>([]);
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [classSearch, setClassSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const toggleSubject = (id: string) => setSubjectIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
   const toggleClass = (id: string) => setClassSectionIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]);
-  return <div className="modal-backdrop"><form className="modal" onSubmit={async e => { e.preventDefault(); if (!fullName.trim()) return; setSaving(true); await onSave({ fullName: fullName.trim(), teacherCode: teacherCode.trim(), email: email.trim(), phone: phone.trim(), subjectIds, classSectionIds }); setSaving(false); }}>
-    <div className="modal-head"><div><h2>{mode === "edit" ? "Edit teacher" : "Add teacher"}</h2><p>Enter the information used by the timetable generator.</p></div><button type="button" className="icon-btn" onClick={close}><X /></button></div>
-    <label>Full name<input required autoFocus value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter full name" /></label>
-    <label>Teacher code<input value={teacherCode} onChange={e => setTeacherCode(e.target.value)} placeholder="e.g. T-001" /></label>
-    <label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter email address" /></label>
-    <label>Phone number<input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Enter phone number" /></label>
-    <fieldset><legend>Subjects taught</legend>
-      {subjectOptions.length === 0 ? <small className="field-hint">Add subjects first to assign them here.</small> : <div className="subject-checks">
-        {subjectOptions.map(s => <label key={s.id} className="check"><input type="checkbox" checked={subjectIds.includes(s.id)} onChange={() => toggleSubject(s.id)} />{s.name}</label>)}
-      </div>}
-    </fieldset>
-    <fieldset><legend>Classes taught</legend>
-      {classOptions.length === 0 ? <small className="field-hint">Add class sections first to assign them here.</small> : <>
-        <small className="field-hint">Creates a teaching assignment for every selected class × subject pair the class's level actually offers, with periods per week set from that level's configuration.</small>
-        <div className="subject-checks" style={{ marginTop: 8 }}>
-          {classOptions.map(c => <label key={c.id} className="check"><input type="checkbox" checked={classSectionIds.includes(c.id)} onChange={() => toggleClass(c.id)} />{c.name}</label>)}
-        </div>
-      </>}
-    </fieldset>
-    <footer><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "teacher"}`}</button></footer>
+  const subjectQuery = subjectSearch.trim().toLowerCase();
+  const classQuery = classSearch.trim().toLowerCase();
+  const filteredSubjects = subjectOptions.filter(subject => !subjectQuery || [subject.name, subject.code ?? ""].some(value => value.toLowerCase().includes(subjectQuery)));
+  const filteredClasses = classOptions.filter(classSection => !classQuery || classSection.name.toLowerCase().includes(classQuery));
+
+  return <div className="modal-backdrop"><form className="modal teacher-modal" onSubmit={async e => { e.preventDefault(); if (!fullName.trim()) return; setSaving(true); await onSave({ fullName: fullName.trim(), teacherCode: teacherCode.trim(), email: email.trim(), phone: phone.trim(), subjectIds, classSectionIds }); setSaving(false); }}>
+    <div className="modal-head teacher-modal-head"><div className="teacher-modal-title"><span><UsersRound /></span><div><h2>{mode === "edit" ? "Edit teacher" : "Add teacher"}</h2><p>Add contact details and teaching responsibilities.</p></div></div><button type="button" className="icon-btn" aria-label="Close teacher form" onClick={close}><X /></button></div>
+    <div className="teacher-details-grid">
+      <label className="teacher-field teacher-name-field"><span><UserRound />Full name</span><input required autoFocus value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Enter full name" /></label>
+      <label className="teacher-field"><span><Hash />Teacher code</span><input value={teacherCode} onChange={e => setTeacherCode(e.target.value)} placeholder="e.g. T-001" /></label>
+      <label className="teacher-field"><span><Mail />Email address</span><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="teacher@school.com" /></label>
+      <label className="teacher-field"><span><Phone />Phone number</span><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Enter phone number" /></label>
+    </div>
+    <div className="teacher-assignment-note"><Info /><div><b>How teaching assignments are created</b><p>Selecting subjects records what this teacher can teach. When you also select classes, ClassGrid creates an assignment for every selected subject that each class level offers, using that level's weekly period requirement.{mode === "edit" ? " Existing assignments are changed or removed from the Teaching assignments page." : " Selecting subjects without classes does not create class assignments."}</p></div></div>
+    <div className="teacher-selection-grid">
+      <fieldset className="teacher-selector"><div className="teacher-selector-head"><div><BookOpen /><span><b>Subjects taught</b><small>{subjectIds.length} selected</small></span></div>{subjectIds.length > 0 && <button type="button" onClick={() => setSubjectIds([])}>Clear</button>}</div>
+        <div className="teacher-selector-search"><Search /><input aria-label="Search subjects" value={subjectSearch} onChange={e => setSubjectSearch(e.target.value)} placeholder="Search subjects" /></div>
+        {subjectOptions.length === 0 ? <small className="teacher-selector-empty">Add subjects first to assign them here.</small> : filteredSubjects.length === 0 ? <small className="teacher-selector-empty">No matching subjects.</small> : <div className="teacher-option-list">
+          {filteredSubjects.map(subject => <label key={subject.id} className={subjectIds.includes(subject.id) ? "teacher-option selected" : "teacher-option"}><input type="checkbox" checked={subjectIds.includes(subject.id)} onChange={() => toggleSubject(subject.id)} /><i style={{ background: subject.color }} /><span><b>{subject.name}</b>{subject.code && <small>{subject.code}</small>}</span></label>)}
+        </div>}
+      </fieldset>
+      <fieldset className="teacher-selector"><div className="teacher-selector-head"><div><School2 /><span><b>Classes taught</b><small>{classSectionIds.length} selected</small></span></div>{classSectionIds.length > 0 && <button type="button" onClick={() => setClassSectionIds([])}>Clear</button>}</div>
+        <div className="teacher-selector-search"><Search /><input aria-label="Search classes" value={classSearch} onChange={e => setClassSearch(e.target.value)} placeholder="Search classes" /></div>
+        {classOptions.length === 0 ? <small className="teacher-selector-empty">Add class sections first to assign them here.</small> : filteredClasses.length === 0 ? <small className="teacher-selector-empty">No matching classes.</small> : <div className="teacher-option-list">
+          {filteredClasses.map(classSection => <label key={classSection.id} className={classSectionIds.includes(classSection.id) ? "teacher-option selected" : "teacher-option"}><input type="checkbox" checked={classSectionIds.includes(classSection.id)} onChange={() => toggleClass(classSection.id)} /><span><b>{classSection.name}</b><small>Creates matching assignments</small></span></label>)}
+        </div>}
+      </fieldset>
+    </div>
+    <footer><span className="teacher-selection-note">{subjectIds.length} subject{subjectIds.length === 1 ? "" : "s"} · {classSectionIds.length} class{classSectionIds.length === 1 ? "" : "es"}</span><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving || !fullName.trim()}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "teacher"}`}</button></footer>
   </form></div>;
 }
 
@@ -141,7 +152,7 @@ export function Teachers() {
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
-  return <TableShell title="Teaching staff" count={filteredTeachers.length} button="Add teacher" onAdd={() => setTeacherModal({ mode: "add" })} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search teachers…">
+  return <div className="setup-page-stack"><Explainer title="Teacher profiles connect people to the timetable">Record what each teacher can teach here. Selecting subjects and classes together can create matching assignments; unavailable times are configured separately on Availability.</Explainer><TableShell title="Teaching staff" count={filteredTeachers.length} button="Add teacher" onAdd={() => setTeacherModal({ mode: "add" })} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search teachers…">
     {loading ? <div className="teacher-cards">{Array.from({ length: 3 }).map((_, i) => <article key={i}>
       <div className="teacher-top"><span className="avatar large skeleton" style={{ boxShadow: "none" }} /></div>
       <h3><Skel w="60%" /></h3>
@@ -174,5 +185,5 @@ export function Teachers() {
       </article>)}
     </div>}
     {teacherModal && <TeacherModal mode={teacherModal.mode} initial={teacherModal.mode === "edit" ? teacherModal.teacher : undefined} subjectOptions={subjectOptions} classOptions={classOptions} close={() => setTeacherModal(null)} onSave={saveTeacher} />}
-  </TableShell>;
+  </TableShell></div>;
 }

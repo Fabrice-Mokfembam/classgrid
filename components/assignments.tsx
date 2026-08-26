@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileCheck2, ShieldCheck, X } from "lucide-react";
+import { BookOpen, CalendarDays, FileCheck2, School2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { TeachingAssignment } from "@/lib/types";
-import { ErrorState, firstError, RowsSkeleton, TableShell } from "@/components/shared";
+import { ErrorState, Explainer, firstError, RowsSkeleton, TableShell } from "@/components/shared";
 
 const PATTERN_LABELS: Record<string, string> = { singles: "Singles", double: "Double", mixed: "Mixed" };
 
@@ -27,18 +27,18 @@ function AssignmentModal({ mode, initial, teacherOptions, subjectOptions, classO
     if (!newLevelId || !levelSubjects.some(ls => ls.levelId === newLevelId && ls.subjectId === subjectId)) setSubjectId("");
   }
 
-  return <div className="modal-backdrop"><form className="modal" onSubmit={async e => { e.preventDefault(); if (!teacherId || !subjectId || !classSectionId || periodsPerWeek == null) return; setSaving(true); await onSave({ teacherId, subjectId, classSectionId, periodsPerWeek, pattern }); setSaving(false); }}>
-    <div className="modal-head"><div><h2>{mode === "edit" ? "Edit teaching assignment" : "Add teaching assignment"}</h2><p>Enter the information used by the timetable generator.</p></div><button type="button" className="icon-btn" onClick={close}><X /></button></div>
-    <label>Teacher<select required autoFocus value={teacherId} onChange={e => setTeacherId(e.target.value)}><option value="">Select teacher</option>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select></label>
-    <label>Class section<select required value={classSectionId} onChange={e => onClassChange(e.target.value)}><option value="">Select class section</option>{classOptions.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
-    {classSectionId && allowedSubjects.length === 0 ? (
-      <small className="field-hint">This class's level has no subjects configured yet — set them up on the Levels page (Manage subjects) first.</small>
-    ) : <>
-      <label>Subject<select required disabled={!classSectionId} value={subjectId} onChange={e => setSubjectId(e.target.value)}><option value="">{classSectionId ? "Select subject" : "Select a class section first"}</option>{allowedSubjects.map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select></label>
-      <label>Periods per week<input value={periodsPerWeek ?? ""} disabled placeholder="Set by the level's subject configuration" /></label>
-    </>}
-    <label>Lesson pattern<select value={pattern} onChange={e => setPattern(e.target.value)}><option value="singles">Singles</option><option value="double">Double</option><option value="mixed">Mixed</option></select></label>
-    <footer><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving || periodsPerWeek == null}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "assignment"}`}</button></footer>
+  return <div className="modal-backdrop"><form className="modal assignment-modal" onSubmit={async e => { e.preventDefault(); if (!teacherId || !subjectId || !classSectionId || periodsPerWeek == null) return; setSaving(true); await onSave({ teacherId, subjectId, classSectionId, periodsPerWeek, pattern }); setSaving(false); }}>
+    <div className="modal-head assignment-modal-head"><div className="assignment-modal-title"><span><FileCheck2 /></span><div><h2>{mode === "edit" ? "Edit teaching assignment" : "Add teaching assignment"}</h2><p>Connect a teacher to one subject and class.</p></div></div><button type="button" className="icon-btn" aria-label="Close assignment form" onClick={close}><X /></button></div>
+    <div className="assignment-form-grid">
+      <label className="assignment-field"><span><UserRound />Teacher</span><select required autoFocus value={teacherId} onChange={e => setTeacherId(e.target.value)}><option value="">Select teacher</option>{teacherOptions.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select></label>
+      <label className="assignment-field"><span><School2 />Class section</span><select required value={classSectionId} onChange={e => onClassChange(e.target.value)}><option value="">Select class section</option>{classOptions.map(c => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label>
+      <label className="assignment-field assignment-subject-field"><span><BookOpen />Subject</span><select required disabled={!classSectionId || allowedSubjects.length === 0} value={subjectId} onChange={e => setSubjectId(e.target.value)}><option value="">{classSectionId ? allowedSubjects.length ? "Select subject" : "No subjects configured" : "Select a class first"}</option>{allowedSubjects.map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select><small>{classSectionId && allowedSubjects.length === 0 ? "Configure subjects for this level from Levels & classes first." : "Only subjects configured for the selected class level appear here."}</small></label>
+      <div className={`assignment-period-summary${periodsPerWeek == null ? " empty" : ""}`}><CalendarDays /><div><span>Weekly requirement</span><b>{periodsPerWeek == null ? "Not set yet" : `${periodsPerWeek} period${periodsPerWeek === 1 ? "" : "s"} per week`}</b><small>Inherited from the level's subject configuration</small></div></div>
+    </div>
+    <fieldset className="assignment-pattern"><legend>Lesson pattern</legend><p>Choose how these periods should normally be placed.</p><div className="assignment-pattern-options">
+      {(["singles", "double", "mixed"] as const).map(value => <button type="button" key={value} className={pattern === value ? "active" : ""} onClick={() => setPattern(value)}><b>{PATTERN_LABELS[value]}</b><small>{value === "singles" ? "Separate periods" : value === "double" ? "Back-to-back periods" : "Allow either layout"}</small></button>)}
+    </div></fieldset>
+    <footer><span className="assignment-ready-note">{teacherId && classSectionId && subjectId ? "Ready to save" : "Choose a teacher, class, and subject"}</span><button type="button" className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={saving || !teacherId || !classSectionId || !subjectId || periodsPerWeek == null}>{saving ? "Saving…" : `Save ${mode === "edit" ? "changes" : "assignment"}`}</button></footer>
   </form></div>;
 }
 
@@ -131,11 +131,10 @@ export function Assignments() {
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />;
 
-  return <TableShell title="Teaching assignments" count={filteredAssignments.length} button="Add assignment" onAdd={() => {
+  return <div className="setup-page-stack"><Explainer title="Assignments are the generator's lesson requirements">Each assignment tells ClassGrid which teacher teaches a subject to a class and how many periods are required each week. Changes are used the next time you regenerate.</Explainer><TableShell title="Teaching assignments" count={filteredAssignments.length} button="Add assignment" onAdd={() => {
     if (teacherOptions.length === 0 || subjectOptions.length === 0 || classOptions.length === 0) { toast.error("Add a teacher, a subject and a class section first"); return; }
     setAssignmentModal({ mode: "add" });
   }} searchValue={search} onSearchChange={setSearch} searchPlaceholder="Search assignments…">
-    <div className="info-banner"><ShieldCheck /><div><b>The assignment is the generator's core input</b><span>It connects one teacher, subject and actual class with its weekly period requirement.</span></div></div>
     {loading ? <div className="data-table"><div className="data-row head assignments"><span>Teacher</span><span>Subject</span><span>Class</span><span>Periods / week</span><span>Pattern</span><span></span></div><RowsSkeleton className="data-row assignments" cols={5} rows={5} /></div> : assignmentsList.length === 0 ? (
       <div className="empty-inspector"><FileCheck2 /><h3>No teaching assignments yet</h3><p>Add your first assignment to get started.</p></div>
     ) : filteredAssignments.length === 0 ? (
@@ -161,5 +160,5 @@ export function Assignments() {
       </div>)}
     </div>}
     {assignmentModal && <AssignmentModal mode={assignmentModal.mode} initial={assignmentModal.mode === "edit" ? assignmentModal.assignment : undefined} teacherOptions={teacherOptions} subjectOptions={subjectOptions} classOptions={classOptions} levelSubjects={levelSubjects} close={() => setAssignmentModal(null)} onSave={saveAssignment} />}
-  </TableShell>;
+  </TableShell></div>;
 }

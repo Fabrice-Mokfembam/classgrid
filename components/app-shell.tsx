@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen, CalendarDays, ChevronDown, Clock3, FileCheck2,
   LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
-  School2, Search, Settings, Sparkles, UsersRound, X,
+  School2, Settings, Sparkles, UsersRound, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
@@ -51,6 +51,13 @@ const nav = [
   { id: "settings", label: "School settings", icon: Settings },
 ] as const;
 
+const navGroups = [
+  { label: "Workspace", ids: ["dashboard"] },
+  { label: "Setup", ids: ["setup", "levels", "subjects", "teachers", "availability", "assignments"] },
+  { label: "Timetable", ids: ["generate", "timetable"] },
+  { label: "Administration", ids: ["settings"] },
+] as const;
+
 const titles: Record<Page, [string, string]> = {
   dashboard: ["Good morning, Administrator", "Here's what's happening with your timetable setup."],
   setup: ["School schedule", "Define your teaching days, lesson periods and breaks."],
@@ -81,6 +88,8 @@ function pageFromPathname(pathname: string, schoolSlug: string): Page {
 export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; children: ReactNode }) {
   const [mobile, setMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const page = pageFromPathname(pathname, schoolSlug);
@@ -96,6 +105,14 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
       window.localStorage.setItem("classgrid-sidebar-collapsed", String(next));
       return next;
     });
+  }
+
+  async function signOut() {
+    const supabase = createClient();
+    if (!supabase) return;
+    setSigningOut(true);
+    await supabase.auth.signOut();
+    router.push("/");
   }
 
   // The URL slug is taken on faith by the server guard; once the real membership
@@ -130,7 +147,7 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           </button>
           <button className="mobile-close" aria-label="Close navigation" onClick={() => setMobile(false)}><X /></button>
         </div>
-        <div className="school-switch">
+        <div className="school-switch sidebar-school-mobile">
           <SchoolLogoMark logoUrl={schoolLogoUrl} name={schoolName} />
           <div>
             <b>{schoolLoading ? <Skel w="80px" /> : schoolName ?? "Your school"}</b>
@@ -139,28 +156,28 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           <ChevronDown />
         </div>
         <nav>
-          {nav.map(n => (
-            <Link
-              key={n.id}
-              href={pagePath(schoolSlug, n.id)}
-              className={page === n.id ? "nav-item active" : "nav-item"}
-              title={sidebarCollapsed ? n.label : undefined}
-              aria-label={sidebarCollapsed ? n.label : undefined}
-              onClick={() => setMobile(false)}
-            >
-              <n.icon />
-              <span className="nav-label">{n.label}</span>
-              {n.id === "generate" && <span className="nav-dot" />}
-            </Link>
+          {navGroups.map(group => (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-group-label">{group.label}</span>
+              {group.ids.map(id => {
+                const n = nav.find(item => item.id === id)!;
+                return <Link
+                  key={n.id}
+                  href={pagePath(schoolSlug, n.id)}
+                  className={page === n.id ? "nav-item active" : "nav-item"}
+                  title={sidebarCollapsed ? n.label : undefined}
+                  aria-label={sidebarCollapsed ? n.label : undefined}
+                  onClick={() => setMobile(false)}
+                >
+                  <n.icon />
+                  <span className="nav-label">{n.label}</span>
+                </Link>;
+              })}
+            </div>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <button className="nav-item sidebar-signout" title={sidebarCollapsed ? "Sign out" : undefined} aria-label={sidebarCollapsed ? "Sign out" : undefined} onClick={async () => {
-            if (!window.confirm(`Sign out of ${APP_NAME}?`)) return;
-            const supabase = createClient();
-            if (supabase) await supabase.auth.signOut();
-            router.push("/");
-          }}>
+          <button className="nav-item sidebar-signout" title={sidebarCollapsed ? "Sign out" : undefined} aria-label={sidebarCollapsed ? "Sign out" : undefined} onClick={() => setSignOutOpen(true)}>
             <LogOut /> <span className="nav-label">Sign out</span>
           </button>
         </div>
@@ -171,9 +188,8 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
       <div className="app-main">
         <header className="topbar">
           <button className="menu-btn" aria-label="Open navigation" onClick={() => setMobile(true)}><Menu /></button>
-          <div className="crumb">School workspace <span>/</span> {titles[page][0]}</div>
+          <div className="crumb">School workspace <span>/</span> {nav.find(n => n.id === page)?.label}</div>
           <div className="top-actions">
-            <button className="icon-btn"><Search /></button>
             <div className="top-school">
               <SchoolLogoMark logoUrl={schoolLogoUrl} name={schoolName} className="small" />
               <div><b>{schoolLoading ? <Skel w="70px" /> : schoolName ?? "Your school"}</b><small>{schoolLoading ? <Skel w="40px" /> : academicYearName ?? ""}</small></div>
@@ -194,6 +210,14 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           </ErrorBoundary>
         </main>
       </div>
+      {signOutOpen && <div className="modal-backdrop" onClick={() => { if (!signingOut) setSignOutOpen(false); }}>
+        <section className="modal signout-modal" role="dialog" aria-modal="true" aria-labelledby="signout-title" onClick={event => event.stopPropagation()}>
+          <div className="signout-modal-icon"><LogOut /></div>
+          <h2 id="signout-title">Sign out of {APP_NAME}?</h2>
+          <p>Your work is already saved. You will need to sign in again to return to this school workspace.</p>
+          <footer><button type="button" className="btn" disabled={signingOut} onClick={() => setSignOutOpen(false)}>Cancel</button><button type="button" className="btn signout-confirm" disabled={signingOut} onClick={signOut}><LogOut /> {signingOut ? "Signing out…" : "Sign out"}</button></footer>
+        </section>
+      </div>}
     </div>
   );
 }

@@ -12,7 +12,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
+import { APP_NAME, WORDMARK_LOGO_URL } from "@/lib/branding";
 
 const guideSteps = [
   {
@@ -137,7 +137,7 @@ export default function GuidePage() {
   return (
     <main className="guide-page">
       <nav className="guide-nav">
-        <Link className="brand" href="/"><span className="brand-mark logo"><img src={DEFAULT_LOGO_URL} alt={`${APP_NAME} logo`} /></span>{APP_NAME}</Link>
+        <Link className="guide-brand" href="/"><img src={WORDMARK_LOGO_URL} alt={`${APP_NAME} logo`} /></Link>
         <div>
           <Link className="btn ghost" href="/">Home</Link>
           <Link className="btn primary" href="/auth">Create school account <ArrowRight size={16} /></Link>
