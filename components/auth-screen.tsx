@@ -137,11 +137,12 @@ export function AuthScreen({ onBack, initialMode = "signup" }: { onBack: () => v
     if (!supabase) { toast.error("Supabase isn't configured — check .env.local"); return; }
 
     setSubmitting(true);
+    const redirectOrigin = window.location.origin;
     const { error } = await supabase.auth.signUp({
       email: profile.adminEmail,
       password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        emailRedirectTo: `${redirectOrigin}/auth/callback`,
         data: { full_name: profile.adminName, pending_school: buildPendingSchool(profile) },
       },
     });

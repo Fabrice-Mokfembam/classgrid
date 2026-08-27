@@ -117,6 +117,11 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) {
+      router.replace(`/auth/callback?code=${encodeURIComponent(code)}`);
+      return () => { cancelled = true; };
+    }
     const supabase = createClient();
     if (!supabase) { setCheckingSession(false); return; }
     (async () => {
