@@ -112,16 +112,37 @@ const guideSteps = [
   },
   {
     icon: Sparkles,
-    title: "Generate, review, and adjust",
-    goal: "Create the timetable, inspect the result, and make safe manual corrections.",
+    title: "Generate the timetable",
+    goal: "Create the first draft using the schedule, classes, subjects, teachers, assignments, availability, and parallel groups.",
     actions: [
-      "Open Generate timetable and confirm the validation checks.",
+      "Open Generate timetable and confirm the timetable checks.",
       "Generate the timetable.",
-      "Open Timetables to view by class, teacher, or master timetable.",
-      "Drag lessons to adjust class views, lock lessons you want to keep, then regenerate unlocked lessons if needed.",
-      "Download the PDF once the timetable is ready to share.",
+      "Open Timetables to view the result by class, teacher, or master timetable.",
     ],
-    result: "You have a timetable that respects teacher availability, class slots, and hard clash rules.",
+    result: "You have a first timetable draft that respects teacher availability, class slots, and hard clash rules.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Run checks, repair, and regenerate",
+    goal: "Check whether the draft is complete before anyone treats it as official.",
+    actions: [
+      "Use Run checks to see missing subjects, missing periods, teacher clashes, or other issues.",
+      "Use class repair when one class needs help filling missing lessons.",
+      "Lock lessons you want to keep, then regenerate unlocked lessons to improve the rest.",
+      "Repeat the checks until the timetable is good enough to share.",
+    ],
+    result: "You know what still needs attention and can improve the timetable without losing fixed lessons.",
+  },
+  {
+    icon: FileCheck2,
+    title: "Publish and export",
+    goal: "Make the finished timetable official for the academic year.",
+    actions: [
+      "Publish only when you are satisfied with the timetable.",
+      "Download the PDF for class, teacher, or master copies.",
+      "If you later change an input such as availability, periods, subjects, classes, or assignments, regenerate and publish again.",
+    ],
+    result: "Staff can use the published timetable as the official school version.",
   },
 ];
 
@@ -131,6 +152,7 @@ const bestPractices = [
   "Use parallel groups sparingly. They are for genuine split-class subjects that can happen in the same slot.",
   "Mark only true teacher unavailability. Too many blocked slots can make a valid timetable impossible.",
   "Lock only the lessons that must stay fixed. More unlocked lessons give the generator more room to improve the timetable.",
+  "Publish only after running checks. If you change timetable inputs later, regenerate and publish the new version.",
 ];
 
 export default function GuidePage() {

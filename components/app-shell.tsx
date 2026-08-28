@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen, CalendarDays, ChevronDown, Clock3, FileCheck2,
-  LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
+  HelpCircle, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen,
   School2, Settings, Sparkles, UsersRound, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -12,16 +12,20 @@ import { useSchool } from "@/lib/school-context";
 import { APP_NAME, DEFAULT_LOGO_URL } from "@/lib/branding";
 import { ErrorBoundary, ErrorState, Skel } from "@/components/shared";
 
-function roleLabel(role: string | null): string {
-  if (!role) return "";
-  return role.split("_").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
-}
-function initialsOf(name: string): string {
-  return name.split(" ").filter(Boolean).map(x => x[0]).join("").slice(0, 2).toUpperCase();
-}
 function SchoolLogoMark({ logoUrl, name, className = "" }: { logoUrl: string | null; name: string | null; className?: string }) {
   return <span className={`school-logo-mark ${className}`}><img src={logoUrl ?? DEFAULT_LOGO_URL} alt={`${name ?? APP_NAME} logo`} /></span>;
 }
+
+const setupHelpSteps = [
+  ["School schedule", "Set teaching days, lesson periods, and breaks first."],
+  ["Levels & classes", "Create levels like Form 1, then real classes like Form 1A."],
+  ["Subjects", "Add every subject once in the school catalog."],
+  ["Subjects per level", "Choose what each level studies and how many periods per week."],
+  ["Teachers", "Add staff and the subjects/classes they can teach."],
+  ["Teaching assignments", "Connect teacher, subject, class, and weekly periods."],
+  ["Availability", "Block only the times a teacher truly cannot teach."],
+  ["Generate & validate", "Generate, check issues, repair or regenerate, then publish."],
+];
 
 // ─── Re-exports so existing page files keep working without changes ────────────
 export { Dashboard } from "@/components/dashboard";
@@ -48,7 +52,7 @@ const nav = [
   { id: "assignments", label: "Teaching assignments", icon: FileCheck2 },
   { id: "generate", label: "Generate timetable", icon: Sparkles },
   { id: "timetable", label: "Timetables", icon: CalendarDays },
-  { id: "settings", label: "School settings", icon: Settings },
+  { id: "settings", label: "School profile", icon: Settings },
 ] as const;
 
 const navGroups = [
@@ -68,7 +72,7 @@ const titles: Record<Page, [string, string]> = {
   assignments: ["Teaching assignments", "Connect each teacher, subject and class with its weekly lesson requirement."],
   generate: ["Generate timetable", "Validate your school data before creating a conflict-free timetable."],
   timetable: ["Timetable editor", "Review, move, lock and publish generated lessons."],
-  settings: ["School settings", "Manage the profile and account details printed on school timetables."],
+  settings: ["School profile", "Manage the school identity and details printed on timetables."],
 };
 
 function pagePath(schoolSlug: string, id: Page) {
@@ -89,11 +93,13 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
   const [mobile, setMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [setupHelpOpen, setSetupHelpOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const page = pageFromPathname(pathname, schoolSlug);
-  const { schoolId, schoolSlug: realSlug, schoolName, schoolLogoUrl, academicYearName, role, fullName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
+  const go = (p: Page) => router.push(pagePath(schoolSlug, p));
+  const { schoolId, schoolSlug: realSlug, schoolName, schoolLogoUrl, academicYearName, loading: schoolLoading, error: schoolError, retry: schoolRetry } = useSchool();
 
   useEffect(() => {
     setSidebarCollapsed(window.localStorage.getItem("classgrid-sidebar-collapsed") === "true");
@@ -194,8 +200,6 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
               <SchoolLogoMark logoUrl={schoolLogoUrl} name={schoolName} className="small" />
               <div><b>{schoolLoading ? <Skel w="70px" /> : schoolName ?? "Your school"}</b><small>{schoolLoading ? <Skel w="40px" /> : academicYearName ?? ""}</small></div>
             </div>
-            <div className="avatar">{schoolLoading ? "" : fullName ? initialsOf(fullName) : "?"}</div>
-            <div className="admin-name"><b>{schoolLoading ? <Skel w="70px" /> : fullName ?? "Unnamed admin"}</b><small>{schoolLoading ? <Skel w="90px" /> : roleLabel(role)}</small></div>
           </div>
         </header>
         <main className="workspace">
@@ -210,6 +214,22 @@ export function AppShellChrome({ schoolSlug, children }: { schoolSlug: string; c
           </ErrorBoundary>
         </main>
       </div>
+      <button className="setup-help-fab" type="button" aria-label="Open setup help" onClick={() => setSetupHelpOpen(true)}><HelpCircle /><span>Setup help</span></button>
+      {setupHelpOpen && <div className="modal-backdrop setup-help-backdrop" onClick={() => setSetupHelpOpen(false)}>
+        <section className="modal setup-help-modal" role="dialog" aria-modal="true" aria-labelledby="setup-help-title" onClick={event => event.stopPropagation()}>
+          <div className="modal-head">
+            <div><h2 id="setup-help-title">Build your timetable in this order</h2><p>Follow the steps from the school grid to the final published timetable.</p></div>
+            <button className="icon-btn" type="button" aria-label="Close setup help" onClick={() => setSetupHelpOpen(false)}><X /></button>
+          </div>
+          <div className="setup-help-steps">
+            {setupHelpSteps.map((step, index) => <button type="button" key={step[0]} onClick={() => { setSetupHelpOpen(false); go(index === 0 ? "setup" : index === 1 || index === 3 ? "levels" : index === 2 ? "subjects" : index === 4 ? "teachers" : index === 5 ? "assignments" : index === 6 ? "availability" : "generate"); }}>
+              <span>{index + 1}</span>
+              <div><b>{step[0]}</b><small>{step[1]}</small></div>
+            </button>)}
+          </div>
+          <footer><button type="button" className="btn" onClick={() => router.push("/guide")}>Open full guide <HelpCircle /></button><button type="button" className="btn primary" onClick={() => setSetupHelpOpen(false)}>Got it</button></footer>
+        </section>
+      </div>}
       {signOutOpen && <div className="modal-backdrop" onClick={() => { if (!signingOut) setSignOutOpen(false); }}>
         <section className="modal signout-modal" role="dialog" aria-modal="true" aria-labelledby="signout-title" onClick={event => event.stopPropagation()}>
           <div className="signout-modal-icon"><LogOut /></div>

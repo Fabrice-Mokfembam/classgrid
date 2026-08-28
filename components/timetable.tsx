@@ -368,7 +368,7 @@ export function Timetable() {
   async function publishTimetable() {
     if (!timetableInfo) return;
     if (timetableInfo.status === "published") { toast.info("This timetable is already published"); return; }
-    if (!validationChecked) { toast.info("Validate the timetable before publishing"); return; }
+    if (!validationChecked) { toast.info("Run checks before publishing"); return; }
     if (validationIssues.length > 0) { toast.error("Fix all assignment period issues before publishing"); return; }
     if (!window.confirm("Publish this timetable? It will become the official timetable for this academic year.")) return;
 
@@ -625,7 +625,7 @@ export function Timetable() {
           <div className="tt-tool-groups">
             <div className="tt-action-cluster" aria-label="Review timetable">
               {view === "class" && <button type="button" onClick={openClassCoverage} title="Review class coverage"><ChartNoAxesColumn /><span>Coverage</span></button>}
-              <button type="button" onClick={validateTimetable} disabled={validating} title="Validate timetable"><ShieldCheck /><span>{validating ? "Validating…" : "Validate"}</span></button>
+              <button type="button" onClick={validateTimetable} disabled={validating} title="Run timetable checks"><ShieldCheck /><span>{validating ? "Checking..." : "Run checks"}</span></button>
             </div>
             <div className="tt-action-cluster" aria-label="Improve timetable">
               {view === "class" && <button type="button" onClick={repairClass} disabled={repairingClass || regenerating} title="Repair the selected class timetable"><Sparkles /><span>{repairingClass ? "Repairing…" : "Repair class"}</span></button>}

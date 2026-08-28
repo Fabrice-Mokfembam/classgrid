@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
-import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, AlertTriangle, FileCheck2, HelpCircle, School2, Sparkles, UsersRound } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, AlertTriangle, FileCheck2, School2, Sparkles, UsersRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useSchool } from "@/lib/school-context";
 import type { SetupStep } from "@/lib/types";
@@ -12,7 +12,7 @@ type Page = "dashboard" | "setup" | "levels" | "subjects" | "teachers" | "availa
 function pagePath(schoolSlug: string, id: Page) { return id === "dashboard" ? `/${schoolSlug}` : `/${schoolSlug}/${id}`; }
 
 function Stat({ icon: Icon, n, label, note }: { icon: any; n: string; label: string; note: string }) {
-  return <article className="stat-card"><span><Icon /></span><div><b>{n}</b><strong>{label}</strong><small>{note}</small></div></article>;
+  return <article className="stat-card dashboard-stat-card"><span><Icon /></span><div><b>{n}</b><strong>{label}</strong><small>{note}</small></div><i className="stat-spark" /></article>;
 }
 function PanelTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return <div className="panel-title"><h3>{title}</h3>{action && <button type="button" onClick={onAction}>{action}<ArrowRight /></button>}</div>;
@@ -23,10 +23,6 @@ function ValidationItem({ good, title, text, onClick }: { good: boolean; title: 
 function Quick({ icon: Icon, text, onClick }: { icon: any; text: string; onClick: () => void }) {
   return <button onClick={onClick}><Icon /><b>{text}</b><ArrowRight /></button>;
 }
-function SetupOrderItem({ n, title, text, onClick }: { n: number; title: string; text: string; onClick: () => void }) {
-  return <button type="button" className="validation-item setup-order-item" onClick={onClick}><span className="setup-order-badge">{n}</span><div><b>{title}</b><small>{text}</small></div><ArrowRight /></button>;
-}
-
 const STEP_ORDER: { key: SetupStep; label: string; page: Page }[] = [
   { key: "school", label: "School profile", page: "settings" },
   { key: "year", label: "Academic year", page: "settings" },
@@ -138,18 +134,21 @@ export function Dashboard() {
   const percent = Math.round((completedCount / STEP_ORDER.length) * 100);
   const nextStep = STEP_ORDER.find(s => !stepsDone[s.key]);
   const totalIssues = issues.hard + issues.soft;
+  const scheduledPercent = stats.requiredPeriods > 0 && timetableInfo ? Math.round((timetableInfo.scheduled / stats.requiredPeriods) * 100) : 0;
+  const unscheduled = timetableInfo ? Math.max(0, stats.requiredPeriods - timetableInfo.scheduled) : stats.requiredPeriods;
+  const dailyAverage = weeklyBars.length ? weeklyBars.reduce((sum, day) => sum + day.count, 0) / weeklyBars.length : 0;
+  const busiestDay = weeklyBars.reduce<WeeklyBar | null>((best, day) => !best || day.count > best.count ? day : best, null);
 
   return <>
-    <section className={`setup-banner${nextStep ? "" : " complete"}`}>
+    <section className={`setup-banner dashboard-setup-banner compact${nextStep ? "" : " complete"}`}>
       {nextStep ? <div className="ring"><span>{percent}%</span></div> : <span className="setup-complete-icon"><CheckCircle2 /></span>}
       <div>
-        <b>{nextStep ? "Complete your school setup" : "School setup complete"}</b>
-        <p>{nextStep ? `Next up: ${nextStep.label}.` : "Everything's configured — generate a timetable whenever you're ready."}</p>
+        <b>{nextStep ? "Setup needs attention" : "Setup complete"}</b>
+        <p>{nextStep ? `Next: ${nextStep.label}.` : "Your workspace is ready."}</p>
         {nextStep && <><div className="progress"><i style={{ width: `${percent}%` }} /></div><small>{completedCount} of {STEP_ORDER.length} steps completed</small></>}
       </div>
       <div className="setup-actions">
-        <button className="btn" onClick={() => router.push("/guide")}><HelpCircle /> Setup guide</button>
-        <button className="btn primary" onClick={() => go(nextStep?.page ?? (timetableInfo ? "timetable" : "generate"))}>{nextStep ? "Continue setup" : timetableInfo ? "Open timetable" : "Generate timetable"} <ArrowRight /></button>
+        <button className="btn primary" onClick={() => go(nextStep?.page ?? (timetableInfo ? "timetable" : "generate"))}>{nextStep ? "Continue" : timetableInfo ? "Open timetable" : "Generate"} <ArrowRight /></button>
       </div>
     </section>
     <section className="stats-grid dashboard-stat-band">
@@ -162,7 +161,8 @@ export function Dashboard() {
       <article className="panel status-card">
         <PanelTitle title="Timetable status" />
         {timetableInfo ? <>
-          <div className="status-content"><div className={`ring small${issues.hard > 0 ? " attention" : ""}`}><span>{timetableInfo.qualityScore ?? "—"}</span></div><div><span className="status-pill">{timetableInfo.status === "draft" ? "Draft" : timetableInfo.status} · Version {timetableInfo.version}</span><h3>{issues.hard > 0 ? "Needs attention" : "Ready for review"}</h3><p>{timetableInfo.scheduled} of {stats.requiredPeriods} lessons scheduled.</p></div></div>
+          <div className="status-content dashboard-status-content"><div className={`ring small${issues.hard > 0 ? " attention" : ""}`} style={{ background: `conic-gradient(${issues.hard > 0 ? "var(--orange)" : "var(--blue)"} 0 ${scheduledPercent}%, #e8edf5 ${scheduledPercent}% 100%)` }}><span>{scheduledPercent}%</span></div><div><span className="status-pill">{timetableInfo.status === "draft" ? "Draft" : timetableInfo.status} · Version {timetableInfo.version}</span><h3>{issues.hard > 0 ? "Needs attention" : "Ready for review"}</h3><p>{timetableInfo.scheduled} of {stats.requiredPeriods} lessons scheduled.</p><div className="dashboard-status-meter"><i style={{ width: `${scheduledPercent}%` }} /></div></div></div>
+          <div className="dashboard-status-legend"><span><i />Scheduled <b>{timetableInfo.scheduled} ({scheduledPercent}%)</b></span><span><i />Unscheduled <b>{unscheduled} ({100 - scheduledPercent}%)</b></span></div>
           <button className={`btn full${issues.hard > 0 ? " primary" : ""}`} onClick={() => go("timetable")}>{issues.hard > 0 ? "Review timetable issues" : "Open timetable editor"} <ArrowRight /></button>
         </> : <div className="empty-inspector" style={{ padding: "24px 0" }}><CalendarDays /><h3>No timetable yet</h3><p>Generate one once your setup is complete.</p></div>}
       </article>
@@ -180,21 +180,12 @@ export function Dashboard() {
         {weeklyBars.length === 0 ? <p style={{ fontSize: 11, color: "var(--muted)" }}>Generate a timetable to see this.</p> : <div className="bars">
           {weeklyBars.map(b => <div key={b.label}><span style={{ height: `${Math.max(4, b.count * 2.4)}px` }}><b>{b.count}</b></span><small>{b.label}</small></div>)}
         </div>}
+        {weeklyBars.length > 0 && <div className="dashboard-workload-summary"><span><small>Daily average</small><b>{dailyAverage.toFixed(1)} lessons</b></span><span><small>Busiest day</small><b>{busiestDay?.label ?? "—"}</b></span></div>}
       </article>
     </section>
     {nextStep && <section className="panel quick">
       <PanelTitle title="Quick actions" />
       <div className="quick-grid"><Quick icon={UsersRound} text="Add teacher" onClick={() => go("teachers")} /><Quick icon={School2} text="Add class" onClick={() => go("levels")} /><Quick icon={FileCheck2} text="Add assignment" onClick={() => go("assignments")} /><Quick icon={Sparkles} text="Generate timetable" onClick={() => go("generate")} /></div>
     </section>}
-    <section className="panel quick">
-      <PanelTitle title="Recommended setup order" />
-      <p className="setup-order-description">Each step depends on the one before it — assignments in particular need subjects configured per level first.</p>
-      <SetupOrderItem n={1} title="Levels" text="Broad groupings like Form 1 or Primary" onClick={() => go("levels")} />
-      <SetupOrderItem n={2} title="Subjects" text="Your school's subject catalog" onClick={() => go("subjects")} />
-      <SetupOrderItem n={3} title="Subjects per level" text="Weekly periods and any parallel groups — Levels page, Manage subjects" onClick={() => go("levels")} />
-      <SetupOrderItem n={4} title="Class sections" text="The actual classes, e.g. Form 1A" onClick={() => go("levels")} />
-      <SetupOrderItem n={5} title="Teachers" text="Who teaches, and optionally which classes" onClick={() => go("teachers")} />
-      <SetupOrderItem n={6} title="Teaching assignments" text="Confirms each teacher × subject × class combination" onClick={() => go("assignments")} />
-    </section>
   </>;
 }
